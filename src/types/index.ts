@@ -128,6 +128,7 @@ export type DepositStatus = "pending" | "approved" | "rejected";
 
 export interface DepositRequest {
   id: string;
+  userId?: string;
   amount: number;
   method: DepositMethod;
   proofImageUrl: string;
@@ -139,6 +140,52 @@ export interface DepositRequest {
   reviewedBy?: string;
 }
 
+export type WithdrawalMethod = "crypto" | "bank_wire" | "paypal" | "other";
+export type WithdrawalStatus = "pending" | "approved" | "rejected";
+
+export interface WithdrawalRequest {
+  id: string;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+  amount: number;
+  method: WithdrawalMethod;
+  destinationDetails: string;
+  note?: string;
+  status: WithdrawalStatus;
+  adminNote?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+}
+
+export type TransactionType = "deposit" | "withdrawal" | "profit" | "adjustment";
+
+export interface FundingTransaction {
+  id: string;
+  userId?: string;
+  type: TransactionType;
+  amount: number;
+  status: "completed" | "pending" | "rejected";
+  title: string;
+  description?: string;
+  method?: string;
+  createdAt: string;
+  adminNote?: string;
+}
+
+export interface ProfitPayoutRecord {
+  id: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  amount: number;
+  payoutType: string;
+  reason: string;
+  actor: string;
+  createdAt: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   actor: string;
@@ -146,3 +193,4 @@ export interface AuditLogEntry {
   target: string;
   createdAt: string;
 }
+

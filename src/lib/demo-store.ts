@@ -2,11 +2,15 @@ import type {
   Activity,
   AuditLogEntry,
   DepositRequest,
+  FundingTransaction,
   PaperOrder,
   Profile,
+  ProfitPayoutRecord,
   SupportTicket,
   SupportTicketReply,
   WatchlistItem,
+  WithdrawalMethod,
+  WithdrawalRequest,
 } from "@/types";
 import { DEMO_POSITIONS } from "@/data/portfolio";
 
@@ -26,6 +30,8 @@ interface DemoUserData {
   supportTickets: SupportTicket[];
   ticketReplies: Record<string, SupportTicketReply[]>;
   depositRequests: DepositRequest[];
+  withdrawalRequests: WithdrawalRequest[];
+  profitPayouts: ProfitPayoutRecord[];
   practiceBalance: number;
 }
 
@@ -59,7 +65,14 @@ function getCredentials(): DemoCredential[] {
 }
 
 function getUserData(userId: string): DemoUserData | null {
-  return readJSON<DemoUserData | null>(key(`user:${userId}`), null);
+  const data = readJSON<DemoUserData | null>(key(`user:${userId}`), null);
+  if (data) {
+    data.depositRequests = data.depositRequests ?? [];
+    data.withdrawalRequests = data.withdrawalRequests ?? [];
+    data.profitPayouts = data.profitPayouts ?? [];
+    data.activities = data.activities ?? [];
+  }
+  return data;
 }
 
 function saveUserData(userId: string, data: DemoUserData): void {
@@ -86,11 +99,6 @@ function seedUserData(
       email,
       memberSince: now,
       practiceBalance: 0,
-      // Every demo signup starts as a regular user. Local demo mode has no server to
-      // enforce RBAC, so admin access is granted explicitly and visibly per-account via
-      // grantDemoAdmin() (Profile → Security) rather than inferred from a credential.
-      // The Supabase-backed path grants admin via the `role` column (see
-      // supabase/schema.sql), gated by RLS — never by anything client-known.
       role: "user",
     },
     watchlist: [
@@ -112,6 +120,8 @@ function seedUserData(
     supportTickets: [],
     ticketReplies: {},
     depositRequests: [],
+    withdrawalRequests: [],
+    profitPayouts: [],
     practiceBalance: 0,
   };
   saveUserData(userId, data);
@@ -513,6 +523,19 @@ export function creditProfitWithAudit(
   data.practiceBalance += amount;
   data.profile.practiceBalance = data.practiceBalance;
 
+  const payoutRecord: ProfitPayoutRecord = {
+    id: crypto.randomUUID(),
+    userId,
+    userName: data.profile.fullName,
+    userEmail: data.profile.email,
+    amount,
+    payoutType,
+    reason,
+    actor,
+    createdAt: new Date().toISOString(),
+  };
+  data.profitPayouts = [payoutRecord, ...(data.profitPayouts ?? [])];
+
   const activityMessage = `Profit Payout: +$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credited (${payoutType}${reason ? ` · ${reason}` : ""})`;
   logActivity(userId, "profit", activityMessage);
 
@@ -526,6 +549,164 @@ export function creditProfitWithAudit(
   }
 
   return { newBalance: data.practiceBalance };
+}
+
+export function getAllProfitPayouts(): ProfitPayoutRecord[] {
+  return getAllDemoUserData().flatMap(({ data }) => data.profitPayouts ?? []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function getProfitPayouts(userId: string): ProfitPayoutRecord[] {
+  const data = getUserData(userId);
+  return (data?.profitPayouts ?? []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function createWithdrawalRequest(
+  userId: string,
+  amount: number,
+  method: WithdrawalMethod,
+  destinationDetails: string,
+  note?: string,
+): WithdrawalRequest {
+  const data = getUserData(userId);
+  if (!data) throw new Error("User not found.");
+
+  if (amount > data.practiceBalance) {
+    throw new Error(`Insufficient funds. Your available balance is $${data.practiceBalance.toFixed(2)}.`);
+  }
+
+  // Reserve or hold balance upon withdrawal request
+  data.practiceBalance -= amount;
+  data.profile.practiceBalance = data.practiceBalance;
+
+  const newReq: WithdrawalRequest = {
+    id: crypto.randomUUID(),
+    userId,
+    userName: data.profile.fullName,
+    userEmail: data.profile.email,
+    amount,
+    method,
+    destinationDetails,
+    note: note || undefined,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+
+  data.withdrawalRequests = [newReq, ...(data.withdrawalRequests ?? [])];
+  saveUserData(userId, data);
+
+  logActivity(userId, "account", `Withdrawal request submitted: $${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} via ${method}`);
+  logAuditEvent(data.profile.email, `Submitted withdrawal request of $${amount.toFixed(2)} (${method})`, "Self");
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, balance: data.practiceBalance } }));
+  }
+
+  return newReq;
+}
+
+export function getWithdrawalRequests(userId: string): WithdrawalRequest[] {
+  const data = getUserData(userId);
+  return (data?.withdrawalRequests ?? []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function getAllWithdrawalRequests(): { userId: string; userName: string; userEmail: string; request: WithdrawalRequest }[] {
+  return getAllDemoUserData().flatMap(({ userId, profile, data }) =>
+    (data.withdrawalRequests ?? []).map((request) => ({
+      userId,
+      userName: profile.fullName,
+      userEmail: profile.email,
+      request,
+    })),
+  ).sort((a, b) => b.request.createdAt.localeCompare(a.request.createdAt));
+}
+
+export function reviewWithdrawalRequest(
+  userId: string,
+  requestId: string,
+  approve: boolean,
+  adminNote: string | undefined,
+  actor: string,
+): void {
+  const data = getUserData(userId);
+  if (!data) throw new Error("User not found.");
+
+  const req = data.withdrawalRequests.find((r) => r.id === requestId);
+  if (!req) throw new Error("Withdrawal request not found.");
+  if (req.status !== "pending") throw new Error("Withdrawal request has already been reviewed.");
+
+  req.status = approve ? "approved" : "rejected";
+  req.adminNote = adminNote || undefined;
+  req.reviewedAt = new Date().toISOString();
+  req.reviewedBy = actor;
+
+  if (approve) {
+    logActivity(userId, "account", `Withdrawal of $${req.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} processed & approved. Sent to: ${req.destinationDetails}`);
+    logAuditEvent(actor, `Approved withdrawal request of $${req.amount.toFixed(2)}${adminNote ? ` (Note: ${adminNote})` : ""}`, data.profile.email);
+  } else {
+    // If rejected, refund the held amount back to user's balance
+    data.practiceBalance += req.amount;
+    data.profile.practiceBalance = data.practiceBalance;
+    logActivity(userId, "account", `Withdrawal request of $${req.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} was rejected. Amount refunded to balance. Reason: ${adminNote}`);
+    logAuditEvent(actor, `Rejected withdrawal request of $${req.amount.toFixed(2)} (Refunded) - Reason: ${adminNote}`, data.profile.email);
+  }
+
+  saveUserData(userId, data);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, balance: data.practiceBalance } }));
+  }
+}
+
+export function getFundingTransactions(userId: string): FundingTransaction[] {
+  const data = getUserData(userId);
+  if (!data) return [];
+
+  const txs: FundingTransaction[] = [];
+
+  for (const dep of data.depositRequests ?? []) {
+    txs.push({
+      id: dep.id,
+      userId,
+      type: "deposit",
+      amount: dep.amount,
+      status: dep.status === "approved" ? "completed" : dep.status === "rejected" ? "rejected" : "pending",
+      title: `Deposit (${dep.method.replace("_", " ").toUpperCase()})`,
+      description: dep.note || `Deposit via ${dep.method}`,
+      method: dep.method,
+      createdAt: dep.createdAt,
+      adminNote: dep.adminNote,
+    });
+  }
+
+  for (const w of data.withdrawalRequests ?? []) {
+    txs.push({
+      id: w.id,
+      userId,
+      type: "withdrawal",
+      amount: w.amount,
+      status: w.status === "approved" ? "completed" : w.status === "rejected" ? "rejected" : "pending",
+      title: `Withdrawal (${w.method.replace("_", " ").toUpperCase()})`,
+      description: `To: ${w.destinationDetails}${w.note ? ` · ${w.note}` : ""}`,
+      method: w.method,
+      createdAt: w.createdAt,
+      adminNote: w.adminNote,
+    });
+  }
+
+  for (const p of data.profitPayouts ?? []) {
+    txs.push({
+      id: p.id,
+      userId,
+      type: "profit",
+      amount: p.amount,
+      status: "completed",
+      title: `Profit Payout (${p.payoutType})`,
+      description: p.reason || `${p.payoutType} by admin`,
+      createdAt: p.createdAt,
+    });
+  }
+
+  return txs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function adjustBalanceWithAudit(userId: string, newBalance: number, reason: string, actor: string): number {
@@ -598,3 +779,4 @@ export function logAuditEvent(actor: string, action: string, target: string): vo
   const entry: AuditLogEntry = { id: crypto.randomUUID(), actor, action, target, createdAt: new Date().toISOString() };
   writeJSON(key("audit-log"), [entry, ...log].slice(0, 100));
 }
+

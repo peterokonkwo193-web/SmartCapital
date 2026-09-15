@@ -17,8 +17,11 @@ import {
   X,
   Clock,
   TrendingUp,
+  ArrowUpFromLine,
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { Spinner } from "@/components/common/spinner";
 
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -59,6 +62,8 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
     tickets,
     repliesByTicket,
     deposits,
+    withdrawals,
+    profitPayouts,
     auditLog,
     loading,
     setUserEnabled,
@@ -70,6 +75,7 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
     addTicketReply,
     cancelOrder,
     reviewDeposit,
+    reviewWithdrawal,
   } = useAdminData();
 
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -85,6 +91,8 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
   const stats = useMemo(() => {
     const activeUsers = users.filter((u) => !u.disabled).length;
     const totalBalance = users.reduce((sum, u) => sum + u.practiceBalance, 0);
+    const totalProfits = profitPayouts.reduce((sum, p) => sum + p.amount, 0);
+    const pendingWithdrawals = withdrawals.filter((w) => w.request.status === "pending").length;
     return {
       totalUsers: users.length,
       activeUsers,
@@ -92,8 +100,10 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
       totalBalance,
       openTickets: tickets.filter((t) => t.ticket.status !== "resolved" && t.ticket.status !== "closed").length,
       pendingDeposits: deposits.filter((d) => d.request.status === "pending").length,
+      pendingWithdrawals,
+      totalProfits,
     };
-  }, [users, orders, tickets, deposits]);
+  }, [users, orders, tickets, deposits, withdrawals, profitPayouts]);
 
   return (
     <div className="space-y-6">
@@ -104,13 +114,15 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-        <StatCard icon={Users} label="Total Registered Users" value={String(stats.totalUsers)} />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+        <StatCard icon={Users} label="Total Users" value={String(stats.totalUsers)} />
         <StatCard icon={UserCheck} label="Active Users" value={String(stats.activeUsers)} />
-        <StatCard icon={ReceiptText} label="Live Trades" value={String(stats.totalOrders)} />
-        <StatCard icon={Wallet} label="Total Liquidity" value={formatCurrency(stats.totalBalance, { compact: true })} />
+        <StatCard icon={Wallet} label="Liquidity" value={formatCurrency(stats.totalBalance, { compact: true })} />
         <StatCard icon={Banknote} label="Pending Deposits" value={String(stats.pendingDeposits)} sub="pending" />
-        <StatCard icon={LifeBuoy} label="Active Support Tickets" value={String(stats.openTickets)} sub="open" />
+        <StatCard icon={ArrowUpFromLine} label="Pending Withdrawals" value={String(stats.pendingWithdrawals)} sub="pending" />
+        <StatCard icon={TrendingUp} label="Profits Given" value={formatCurrency(stats.totalProfits, { compact: true })} />
+        <StatCard icon={ReceiptText} label="Live Trades" value={String(stats.totalOrders)} />
+        <StatCard icon={LifeBuoy} label="Support" value={String(stats.openTickets)} sub="open" />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -123,6 +135,17 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
                 {stats.pendingDeposits}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="withdrawals" className="relative">
+            Withdrawals
+            {stats.pendingWithdrawals > 0 && (
+              <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                {stats.pendingWithdrawals}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="profits">
+            Profits & ROI
           </TabsTrigger>
           <TabsTrigger value="trades">Live Trades</TabsTrigger>
           <TabsTrigger value="market-data">Market Data</TabsTrigger>
@@ -143,6 +166,17 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
         </TabsContent>
         <TabsContent value="deposits">
           <DepositsTab deposits={deposits} loading={loading} onReview={reviewDeposit} />
+        </TabsContent>
+        <TabsContent value="withdrawals">
+          <WithdrawalsTab withdrawals={withdrawals} loading={loading} onReview={reviewWithdrawal} />
+        </TabsContent>
+        <TabsContent value="profits">
+          <ProfitsTab
+            users={users}
+            payouts={profitPayouts}
+            loading={loading}
+            onCreditProfit={creditProfit}
+          />
         </TabsContent>
         <TabsContent value="trades">
           <TradesTab orders={orders} loading={loading} onCancel={cancelOrder} onCorrect={correctTrade} />
@@ -911,6 +945,644 @@ function DepositReviewDialog({
               disabled={submitting}
             >
               {submitting ? "Processing…" : approve ? `Approve & Credit ${formatCurrency(row.request.amount)}` : "Reject Request"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function WithdrawalsTab({
+  withdrawals,
+  loading,
+  onReview,
+}: {
+  withdrawals: ReturnType<typeof useAdminData>["withdrawals"];
+  loading: boolean;
+  onReview: (userId: string, requestId: string, approve: boolean, adminNote: string | undefined) => Promise<void>;
+}) {
+  const [reviewing, setReviewing] = useState<ReturnType<typeof useAdminData>["withdrawals"][number] | null>(null);
+  const [reviewApprove, setReviewApprove] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const pendingCount = withdrawals.filter((w) => w.request.status === "pending").length;
+  const approvedCount = withdrawals.filter((w) => w.request.status === "approved").length;
+  const rejectedCount = withdrawals.filter((w) => w.request.status === "rejected").length;
+
+  const filtered = withdrawals.filter((w) => {
+    if (filterStatus !== "all" && w.request.status !== filterStatus) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = w.userName.toLowerCase().includes(q);
+      const matchEmail = w.userEmail.toLowerCase().includes(q);
+      const matchDest = w.request.destinationDetails.toLowerCase().includes(q);
+      if (!matchName && !matchEmail && !matchDest) return false;
+    }
+    return true;
+  });
+
+  if (!loading && withdrawals.length === 0) {
+    return (
+      <EmptyState
+        icon={ArrowUpFromLine}
+        title="No withdrawal requests"
+        description="When users request withdrawals, they'll appear here for administrative approval."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-center">
+          <p className="font-mono text-2xl font-bold text-warning">{pendingCount}</p>
+          <p className="text-xs text-muted-foreground">Pending Review</p>
+        </div>
+        <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-center">
+          <p className="font-mono text-2xl font-bold text-success">{approvedCount}</p>
+          <p className="text-xs text-muted-foreground">Approved & Sent</p>
+        </div>
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-center">
+          <p className="font-mono text-2xl font-bold text-destructive">{rejectedCount}</p>
+          <p className="text-xs text-muted-foreground">Rejected & Refunded</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {(["pending", "all", "approved", "rejected"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setFilterStatus(s)}
+              className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                filterStatus === s
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {s} ({s === "all" ? withdrawals.length : s === "pending" ? pendingCount : s === "approved" ? approvedCount : rejectedCount})
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search by client or address..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {filtered.length === 0 ? (
+            <div className="py-12">
+              <EmptyState
+                icon={ArrowUpFromLine}
+                title="No withdrawal requests"
+                description={
+                  filterStatus === "pending"
+                    ? "No pending withdrawals awaiting review."
+                    : "No withdrawal requests match your filter."
+                }
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Channel & Destination</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((w) => (
+                    <TableRow key={w.request.id}>
+                      <TableCell>
+                        <p className="font-medium text-sm text-foreground">{w.userName}</p>
+                        <p className="text-xs text-muted-foreground">{w.userEmail}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-base font-bold text-amber-500">
+                          {formatCurrency(w.request.amount)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="text-xs font-semibold capitalize text-foreground">
+                          {w.request.method.replace("_", " ")}
+                        </div>
+                        <div className="truncate text-xs font-mono text-muted-foreground" title={w.request.destinationDetails}>
+                          {w.request.destinationDetails}
+                        </div>
+                        {w.request.note && (
+                          <div className="text-[11px] text-muted-foreground italic truncate">Memo: {w.request.note}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDateTime(w.request.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            w.request.status === "approved"
+                              ? "success"
+                              : w.request.status === "rejected"
+                              ? "destructive"
+                              : "warning"
+                          }
+                          className="capitalize text-xs"
+                        >
+                          {w.request.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {w.request.status === "pending" ? (
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                              onClick={() => {
+                                setReviewing(w);
+                                setReviewApprove(true);
+                              }}
+                            >
+                              <Check className="mr-1 size-3.5" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setReviewing(w);
+                                setReviewApprove(false);
+                              }}
+                            >
+                              <X className="mr-1 size-3.5" /> Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground text-right">
+                            {w.request.reviewedBy && (
+                              <p className="truncate">Reviewed: {w.request.reviewedBy}</p>
+                            )}
+                            {w.request.adminNote && (
+                              <p className="italic text-foreground truncate max-w-xs ml-auto">"{w.request.adminNote}"</p>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {reviewing && (
+        <WithdrawalReviewDialog
+          row={reviewing}
+          approve={reviewApprove}
+          open={Boolean(reviewing)}
+          onOpenChange={(open) => !open && setReviewing(null)}
+          onConfirm={onReview}
+        />
+      )}
+    </div>
+  );
+}
+
+function WithdrawalReviewDialog({
+  row,
+  approve,
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  row: ReturnType<typeof useAdminData>["withdrawals"][number];
+  approve: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (userId: string, requestId: string, approve: boolean, adminNote: string | undefined) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!approve && !note.trim()) {
+      toast.error("A reason is mandatory when rejecting a withdrawal request.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onConfirm(row.userId, row.request.id, approve, note.trim() || undefined);
+      toast.success(
+        approve ? `✓ Approved payout for ${row.userName}` : `✗ Rejected withdrawal for ${row.userName}`,
+        {
+          description: approve
+            ? `${formatCurrency(row.request.amount)} marked disbursed.`
+            : "Funds have been refunded to user balance.",
+        },
+      );
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to review withdrawal.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {approve ? (
+                <span className="flex size-8 items-center justify-center rounded-full bg-success/20 text-success">
+                  <Check className="size-4" />
+                </span>
+              ) : (
+                <span className="flex size-8 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                  <X className="size-4" />
+                </span>
+              )}
+              {approve ? "Approve & Disburse Payout" : "Reject Withdrawal Request"}
+            </DialogTitle>
+            <DialogDescription>
+              Client: <strong>{row.userName}</strong> ({row.userEmail})
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Requested Payout</span>
+              <span className="font-mono text-xl font-bold text-amber-500">{formatCurrency(row.request.amount)}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-muted-foreground">Payment Channel:</span>
+              <span className="font-semibold text-foreground capitalize">{row.request.method.replace("_", " ")}</span>
+            </div>
+            <div className="text-xs space-y-1 pt-2 border-t border-border/60">
+              <span className="text-muted-foreground font-medium">Destination Details:</span>
+              <p className="font-mono text-foreground bg-background p-2 rounded border border-border select-all break-all text-[11px]">
+                {row.request.destinationDetails}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="w-admin-note">
+              {approve ? "Administrative Memo / Blockchain TXID (Optional)" : "Rejection Reason (Mandatory)"}
+            </Label>
+            <Textarea
+              id="w-admin-note"
+              rows={3}
+              placeholder={
+                approve
+                  ? "e.g. Sent via Blockchain TXID or Wire Reference #"
+                  : "e.g. Invalid account/wallet format. Please submit again with correct details."
+              }
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              required={!approve}
+            />
+            {!approve && (
+              <p className="text-xs text-muted-foreground">
+                The requested amount will be automatically refunded to the client's balance.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className={approve ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-destructive text-white hover:bg-destructive/90"}
+            >
+              {submitting ? "Processing..." : approve ? "Confirm Approval & Payout" : "Reject & Refund Balance"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProfitsTab({
+  users,
+  payouts,
+  loading,
+  onCreditProfit,
+}: {
+  users: ReturnType<typeof useAdminData>["users"];
+  payouts: ReturnType<typeof useAdminData>["profitPayouts"];
+  loading: boolean;
+  onCreditProfit: (userId: string, amount: number, payoutType: string, reason: string) => Promise<void>;
+}) {
+  const [selectedUser, setSelectedUser] = useState<ReturnType<typeof useAdminData>["users"][number] | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const totalProfits = payouts.reduce((sum, p) => sum + p.amount, 0);
+
+  const filteredPayouts = payouts.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (p.userName?.toLowerCase().includes(q) ?? false) ||
+      (p.userEmail?.toLowerCase().includes(q) ?? false) ||
+      p.payoutType.toLowerCase().includes(q) ||
+      p.reason.toLowerCase().includes(q)
+    );
+  });
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-16">
+          <Spinner />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Client Profit Distribution & ROI Governance</h3>
+          <p className="text-xs text-muted-foreground">
+            Credit trading profits, daily ROI yields, and bonuses directly to client accounts.
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            setSelectedUser(users[0] || null);
+            setDialogOpen(true);
+          }}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-sm"
+        >
+          <TrendingUp className="size-4" /> Distribute Profit
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase">Total Profits Distributed</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-emerald-400">{formatCurrency(totalProfits)}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Across all client accounts</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase">Total Payouts Logged</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">{payouts.length}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Historical credit operations</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 col-span-2 lg:col-span-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase">Active Client Liquidity</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+            {formatCurrency(users.reduce((s, u) => s + u.practiceBalance, 0))}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Total platform client balances</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-base">Recent Profit Distributions</CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search payout records..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredPayouts.length === 0 ? (
+            <div className="py-12">
+              <EmptyState
+                icon={TrendingUp}
+                title="No profit distributions recorded"
+                description="Click 'Distribute Profit' above to credit ROI or trading profits to any client."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Category / Type</TableHead>
+                    <TableHead>Amount Credited</TableHead>
+                    <TableHead>Reason / Notes</TableHead>
+                    <TableHead>Processed By</TableHead>
+                    <TableHead className="text-right">Timestamp</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPayouts.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <p className="font-medium text-sm text-foreground">{p.userName || "Client"}</p>
+                        <p className="text-xs text-muted-foreground">{p.userEmail}</p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs font-medium border-emerald-500/30 text-emerald-400 bg-emerald-500/5">
+                          {p.payoutType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-sm font-bold text-emerald-400">
+                          +{formatCurrency(p.amount)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                        {p.reason}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {p.actor}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground text-right whitespace-nowrap">
+                        {formatDateTime(p.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {dialogOpen && (
+        <DistributeProfitModal
+          users={users}
+          initialUser={selectedUser}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onConfirm={onCreditProfit}
+        />
+      )}
+    </div>
+  );
+}
+
+function DistributeProfitModal({
+  users,
+  initialUser,
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  users: ReturnType<typeof useAdminData>["users"];
+  initialUser: ReturnType<typeof useAdminData>["users"][number] | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (userId: string, amount: number, payoutType: string, reason: string) => Promise<void>;
+}) {
+  const [targetUserId, setTargetUserId] = useState(initialUser?.id || users[0]?.id || "");
+  const [profitAmount, setProfitAmount] = useState("500");
+  const [payoutType, setPayoutType] = useState("Daily ROI Payout");
+  const [reason, setReason] = useState("Trading session profit distribution");
+  const [submitting, setSubmitting] = useState(false);
+
+  const targetUser = users.find((u) => u.id === targetUserId);
+  const parsedAmount = parseFloat(profitAmount) || 0;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!targetUser) {
+      toast.error("Please select a valid user.");
+      return;
+    }
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Please enter a positive profit amount.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onConfirm(targetUser.id, parsedAmount, payoutType, reason.trim() || "Trading profit payout");
+      toast.success(`Credited +${formatCurrency(parsedAmount)} profit to ${targetUser.fullName}`, {
+        description: "The funds and transaction are now visible in the user's dashboard.",
+      });
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to credit profit.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="size-5 text-emerald-500" />
+              Give Profit to Client
+            </DialogTitle>
+            <DialogDescription>
+              Credit ROI returns or trade earnings directly to any registered client.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="profit-user">Select Recipient Client</Label>
+            <Select value={targetUserId} onValueChange={setTargetUserId}>
+              <SelectTrigger id="profit-user">
+                <SelectValue placeholder="Choose user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.fullName} ({u.email}) — Balance: {formatCurrency(u.practiceBalance)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="payout-type">Distribution Category</Label>
+            <Select value={payoutType} onValueChange={setPayoutType}>
+              <SelectTrigger id="payout-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Daily ROI Payout">Daily ROI Payout</SelectItem>
+                <SelectItem value="Trading Profit Return">Trading Profit Return</SelectItem>
+                <SelectItem value="Weekly Portfolio Dividend">Weekly Portfolio Dividend</SelectItem>
+                <SelectItem value="Account Incentive / Bonus">Account Incentive / Bonus</SelectItem>
+                <SelectItem value="Referral Commission">Referral Commission</SelectItem>
+                <SelectItem value="Direct Capital Credit">Direct Capital Credit</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="profit-amount">Profit Amount (USD)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+              <Input
+                id="profit-amount"
+                type="number"
+                step="0.01"
+                min="1"
+                placeholder="500.00"
+                className="pl-7"
+                value={profitAmount}
+                onChange={(e) => setProfitAmount(e.target.value)}
+              />
+            </div>
+            {targetUser && parsedAmount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Client balance will increase from{" "}
+                <span className="font-mono">{formatCurrency(targetUser.practiceBalance)}</span> to{" "}
+                <span className="font-mono font-bold text-emerald-400">
+                  {formatCurrency(targetUser.practiceBalance + parsedAmount)}
+                </span>
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="profit-reason">Reason / Session Reference</Label>
+            <Textarea
+              id="profit-reason"
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Q3 Algorithmic Yield or Day Session Gain"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting || parsedAmount <= 0} className="bg-emerald-600 hover:bg-emerald-500 text-white">
+              {submitting ? <Spinner className="mr-2 size-4" /> : null}
+              Confirm & Credit Profit
             </Button>
           </DialogFooter>
         </form>

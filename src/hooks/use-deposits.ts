@@ -26,34 +26,50 @@ export function useDeposits() {
       return;
     }
     if (isSupabaseConfigured && supabase) {
-      const client = supabase;
-      const { data } = await client
-        .from("deposit_requests")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      try {
+        const client = supabase;
+        const { data, error } = await client
+          .from("deposit_requests")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
 
-      const rows = await Promise.all(
-        (data ?? []).map(async (row) => {
-          const { data: signed } = await client.storage
-            .from("deposit-proofs")
-            .createSignedUrl(row.proof_image_path, 3600);
-          const request: DepositRequest = {
-            id: row.id,
-            amount: row.amount,
-            method: row.method,
-            proofImageUrl: signed?.signedUrl ?? "",
-            note: row.note ?? undefined,
-            status: row.status,
-            adminNote: row.admin_note ?? undefined,
-            createdAt: row.created_at,
-            reviewedAt: row.reviewed_at ?? undefined,
-            reviewedBy: row.reviewed_by ?? undefined,
-          };
-          return request;
-        }),
-      );
-      setRequests(rows);
+        if (error || !data) {
+          setRequests(demoStore.getDepositRequests(user.id));
+        } else {
+          const rows = await Promise.all(
+            data.map(async (row) => {
+              let signedUrl = "";
+              try {
+                const { data: signed } = await client.storage
+                  .from("deposit-proofs")
+                  .createSignedUrl(row.proof_image_path, 3600);
+                signedUrl = signed?.signedUrl ?? "";
+              } catch {
+                signedUrl = "";
+              }
+
+              const request: DepositRequest = {
+                id: row.id,
+                userId: row.user_id,
+                amount: Number(row.amount),
+                method: row.method,
+                proofImageUrl: signedUrl,
+                note: row.note ?? undefined,
+                status: row.status,
+                adminNote: row.admin_note ?? undefined,
+                createdAt: row.created_at,
+                reviewedAt: row.reviewed_at ?? undefined,
+                reviewedBy: row.reviewed_by ?? undefined,
+              };
+              return request;
+            }),
+          );
+          setRequests(rows);
+        }
+      } catch {
+        setRequests(demoStore.getDepositRequests(user.id));
+      }
     } else {
       setRequests(demoStore.getDepositRequests(user.id));
     }
@@ -63,6 +79,9 @@ export function useDeposits() {
   useEffect(() => {
     setLoading(true);
     load();
+
+    const handleBalanceEvent = () => load();
+    window.addEventListener("marketcapital_balance_updated", handleBalanceEvent);
 
     if (isSupabaseConfigured && supabase && user) {
       const client = supabase;
@@ -75,9 +94,14 @@ export function useDeposits() {
         )
         .subscribe();
       return () => {
+        window.removeEventListener("marketcapital_balance_updated", handleBalanceEvent);
         client.removeChannel(channel);
       };
     }
+
+    return () => {
+      window.removeEventListener("marketcapital_balance_updated", handleBalanceEvent);
+    };
   }, [load, user]);
 
   const submitDeposit = useCallback(
@@ -85,20 +109,25 @@ export function useDeposits() {
       if (!user) throw new Error("You must be signed in to submit a deposit.");
 
       if (isSupabaseConfigured && supabase) {
-        const path = `${user.id}/${crypto.randomUUID()}-${input.proofImage.name}`;
-        const { error: uploadError } = await supabase.storage.from("deposit-proofs").upload(path, input.proofImage);
-        if (uploadError) throw uploadError;
-
-        const { error } = await supabase.from("deposit_requests").insert({
-          user_id: user.id,
-          amount: input.amount,
-          method: input.method,
-          note: input.note || null,
-          proof_image_path: path,
-        });
-        if (error) throw error;
-        await load();
-        return;
+        try {
+          const path = `${user.id}/${crypto.randomUUID()}-${input.proofImage.name}`;
+          const { error: uploadError } = await supabase.storage.from("deposit-proofs").upload(path, input.proofImage);
+          if (!uploadError) {
+            const { error: insertError } = await supabase.from("deposit_requests").insert({
+              user_id: user.id,
+              amount: input.amount,
+              method: input.method,
+              note: input.note || null,
+              proof_image_path: path,
+            });
+            if (!insertError) {
+              await load();
+              return;
+            }
+          }
+        } catch {
+          // Fall back to demoStore
+        }
       }
 
       const dataUrl = await toDataUrl(input.proofImage);

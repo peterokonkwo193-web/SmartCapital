@@ -22,7 +22,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "Markets", href: "/markets", icon: LineChart },
   { label: "Portfolio", href: "/portfolio", icon: Briefcase },
   { label: "Live Trading", href: "/paper-trading", icon: CandlestickChart },
-  { label: "Deposits", href: "/deposits", icon: Banknote },
+  { label: "Funding & History", href: "/deposits", icon: Banknote },
   { label: "Watchlist", href: "/watchlist", icon: Star },
   { label: "Trader Strategies", href: "/traders", icon: Users },
   { label: "Education", href: "/education", icon: GraduationCap },

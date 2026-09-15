@@ -39,6 +39,13 @@ export const depositRequestSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+export const withdrawalRequestSchema = z.object({
+  amount: z.coerce.number().positive("Enter an amount greater than 0"),
+  method: z.enum(["crypto", "bank_wire", "paypal", "other"], { message: "Select a withdrawal method" }),
+  destinationDetails: z.string().min(4, "Destination details (wallet address or bank account) are required").max(500),
+  note: z.string().max(500).optional(),
+});
+
 export const paperOrderSchema = z.object({
   symbol: z.string().min(1, "Select an asset"),
   side: z.enum(["buy", "sell"]),
@@ -54,5 +61,8 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 export type SupportTicketInput = z.infer<typeof supportTicketSchema>;
 export type DepositRequestInput = z.infer<typeof depositRequestSchema>;
 export type DepositRequestFormValues = z.input<typeof depositRequestSchema>;
+export type WithdrawalRequestInput = z.infer<typeof withdrawalRequestSchema>;
+export type WithdrawalRequestFormValues = z.input<typeof withdrawalRequestSchema>;
 export type PaperOrderInput = z.infer<typeof paperOrderSchema>;
 export type PaperOrderFormValues = z.input<typeof paperOrderSchema>;
+

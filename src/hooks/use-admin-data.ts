@@ -3,25 +3,41 @@ import { useCallback, useEffect, useState } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import * as demoStore from "@/lib/demo-store";
 import { useAuth } from "@/hooks/use-auth";
-import type { AuditLogEntry, DepositRequest, PaperOrder, Profile, SupportTicket, SupportTicketReply } from "@/types";
+import type {
+  AuditLogEntry,
+  DepositRequest,
+  PaperOrder,
+  Profile,
+  ProfitPayoutRecord,
+  SupportTicket,
+  SupportTicketReply,
+  WithdrawalMethod,
+  WithdrawalRequest,
+} from "@/types";
 
-interface AdminUserRow extends Profile {}
-interface AdminOrderRow {
+export interface AdminUserRow extends Profile {}
+export interface AdminOrderRow {
   userId: string;
   userName: string;
   order: PaperOrder;
 }
-interface AdminTicketRow {
+export interface AdminTicketRow {
   userId: string;
   userName: string;
   userEmail: string;
   ticket: SupportTicket;
 }
-interface AdminDepositRow {
+export interface AdminDepositRow {
   userId: string;
   userName: string;
   userEmail: string;
   request: DepositRequest;
+}
+export interface AdminWithdrawalRow {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  request: WithdrawalRequest;
 }
 
 export function useAdminData() {
@@ -31,6 +47,8 @@ export function useAdminData() {
   const [tickets, setTickets] = useState<AdminTicketRow[]>([]);
   const [repliesByTicket, setRepliesByTicket] = useState<Record<string, SupportTicketReply[]>>({});
   const [deposits, setDeposits] = useState<AdminDepositRow[]>([]);
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawalRow[]>([]);
+  const [profitPayouts, setProfitPayouts] = useState<ProfitPayoutRecord[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +63,7 @@ export function useAdminData() {
         { data: depositRows },
         { data: audit },
       ] = await Promise.all([
-        client.from("profiles").select("*"),
+        client.from("profiles").select("*").order("created_at", { ascending: false }),
         client.from("paper_trades").select("*, profiles(full_name)"),
         client.from("support_tickets").select("*, profiles(full_name, email)"),
         client.from("support_ticket_replies").select("*, profiles(full_name)").order("created_at", { ascending: true }),
@@ -53,23 +71,23 @@ export function useAdminData() {
         client.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(100),
       ]);
 
-      setUsers(
-        (profiles ?? []).map((p) => ({
-          id: p.id,
-          fullName: p.full_name,
-          firstName: p.first_name ?? "",
-          lastName: p.last_name ?? "",
-          phone: p.phone ?? "",
-          country: p.country ?? "",
-          email: p.email,
-          memberSince: p.created_at,
-          practiceBalance: p.practice_balance ?? 0,
-          role: p.role ?? "user",
-          disabled: p.disabled ?? false,
-        })),
-      );
+      const mappedUsers: AdminUserRow[] = (profiles ?? []).map((p) => ({
+        id: p.id,
+        fullName: p.full_name,
+        firstName: p.first_name ?? "",
+        lastName: p.last_name ?? "",
+        phone: p.phone ?? "",
+        country: p.country ?? "",
+        email: p.email,
+        memberSince: p.created_at,
+        practiceBalance: Number(p.practice_balance ?? 0),
+        role: p.role ?? "user",
+        disabled: p.disabled ?? false,
+      }));
+      setUsers(mappedUsers);
+
       setOrders(
-        (paperTrades ?? []).map((row) => ({
+        (paperTrades ?? []).map((row: any) => ({
           userId: row.user_id,
           userName: row.profiles?.full_name ?? "Unknown",
           order: {
@@ -84,8 +102,9 @@ export function useAdminData() {
           },
         })),
       );
+
       setTickets(
-        (supportTickets ?? []).map((row) => ({
+        (supportTickets ?? []).map((row: any) => ({
           userId: row.user_id,
           userName: row.profiles?.full_name ?? "Unknown",
           userEmail: row.profiles?.email ?? "",
@@ -99,12 +118,13 @@ export function useAdminData() {
           },
         })),
       );
+
       const grouped: Record<string, SupportTicketReply[]> = {};
       for (const row of replyRows ?? []) {
         const reply: SupportTicketReply = {
           id: row.id,
           ticketId: row.ticket_id,
-          authorName: row.profiles?.full_name ?? "Support Team",
+          authorName: (row as any).profiles?.full_name ?? "Support Team",
           message: row.message,
           isInternal: row.is_internal,
           createdAt: row.created_at,
@@ -112,18 +132,70 @@ export function useAdminData() {
         (grouped[reply.ticketId] ??= []).push(reply);
       }
       setRepliesByTicket(grouped);
-      const depositRowsWithUrls = await Promise.all(
-        (depositRows ?? []).map(async (row) => {
-          const { data: signed } = await client.storage.from("deposit-proofs").createSignedUrl(row.proof_image_path, 3600);
-          return {
+
+      // Deposits: process Supabase results or combine with local
+      let loadedDeposits: AdminDepositRow[] = [];
+      if (depositRows && Array.isArray(depositRows)) {
+        loadedDeposits = await Promise.all(
+          depositRows.map(async (row: any) => {
+            let signedUrl = "";
+            try {
+              const { data: signed } = await client.storage.from("deposit-proofs").createSignedUrl(row.proof_image_path, 3600);
+              signedUrl = signed?.signedUrl ?? "";
+            } catch {
+              signedUrl = "";
+            }
+
+            return {
+              userId: row.user_id,
+              userName: row.profiles?.full_name ?? "Unknown",
+              userEmail: row.profiles?.email ?? "",
+              request: {
+                id: row.id,
+                userId: row.user_id,
+                amount: Number(row.amount),
+                method: row.method,
+                proofImageUrl: signedUrl,
+                note: row.note ?? undefined,
+                status: row.status,
+                adminNote: row.admin_note ?? undefined,
+                createdAt: row.created_at,
+                reviewedAt: row.reviewed_at ?? undefined,
+                reviewedBy: row.reviewed_by ?? undefined,
+              },
+            };
+          }),
+        );
+      }
+
+      // Merge local deposit requests if any
+      const localDeposits = demoStore.getAllDepositRequests();
+      for (const ld of localDeposits) {
+        if (!loadedDeposits.some((d) => d.request.id === ld.request.id)) {
+          loadedDeposits.push(ld);
+        }
+      }
+      setDeposits(loadedDeposits);
+
+      // Withdrawals: load from Supabase or fallback to local
+      let loadedWithdrawals: AdminWithdrawalRow[] = [];
+      try {
+        const { data: withData } = await client
+          .from("withdrawal_requests")
+          .select("*, profiles(full_name, email)")
+          .order("created_at", { ascending: false });
+
+        if (withData && Array.isArray(withData)) {
+          loadedWithdrawals = withData.map((row: any) => ({
             userId: row.user_id,
-            userName: row.profiles?.full_name ?? "Unknown",
+            userName: row.profiles?.full_name ?? "Client",
             userEmail: row.profiles?.email ?? "",
             request: {
               id: row.id,
-              amount: row.amount,
-              method: row.method,
-              proofImageUrl: signed?.signedUrl ?? "",
+              userId: row.user_id,
+              amount: Number(row.amount),
+              method: row.method as WithdrawalMethod,
+              destinationDetails: row.destination_details ?? row.destination ?? "",
               note: row.note ?? undefined,
               status: row.status,
               adminNote: row.admin_note ?? undefined,
@@ -131,12 +203,31 @@ export function useAdminData() {
               reviewedAt: row.reviewed_at ?? undefined,
               reviewedBy: row.reviewed_by ?? undefined,
             },
-          };
-        }),
-      );
-      setDeposits(depositRowsWithUrls);
+          }));
+        }
+      } catch {
+        // Table not present yet
+      }
+
+      const localWithdrawals = demoStore.getAllWithdrawalRequests();
+      for (const lw of localWithdrawals) {
+        if (!loadedWithdrawals.some((w) => w.request.id === lw.request.id)) {
+          loadedWithdrawals.push(lw);
+        }
+      }
+      setWithdrawals(loadedWithdrawals);
+
+      // Profits
+      setProfitPayouts(demoStore.getAllProfitPayouts());
+
       setAuditLog(
-        (audit ?? []).map((row) => ({ id: row.id, actor: row.actor, action: row.action, target: row.target, createdAt: row.created_at })),
+        (audit ?? []).map((row: any) => ({
+          id: row.id,
+          actor: row.actor,
+          action: row.action,
+          target: row.target,
+          createdAt: row.created_at,
+        })),
       );
     } else {
       const allTickets = demoStore.getAllSupportTickets();
@@ -149,6 +240,8 @@ export function useAdminData() {
       }
       setRepliesByTicket(grouped);
       setDeposits(demoStore.getAllDepositRequests());
+      setWithdrawals(demoStore.getAllWithdrawalRequests());
+      setProfitPayouts(demoStore.getAllProfitPayouts());
       setAuditLog(demoStore.getAuditLog());
     }
     setLoading(false);
@@ -191,15 +284,21 @@ export function useAdminData() {
     async (userId: string, newBalance: number, reason: string) => {
       const actor = user?.email ?? "admin";
       if (!reason.trim()) throw new Error("A reason is mandatory for balance adjustments.");
+
+      demoStore.adjustBalanceWithAudit(userId, newBalance, reason, actor);
+
       if (isSupabaseConfigured && supabase) {
-        const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
-        const oldBal = targetProfile?.practice_balance ?? 0;
-        const adj = newBalance - oldBal;
-        await supabase.from("profiles").update({ practice_balance: newBalance }).eq("id", userId);
-        const actionDesc = `Balance Adjustment: Old=$${oldBal.toFixed(2)}, New=$${newBalance.toFixed(2)}, Adj=$${adj >= 0 ? "+" : ""}$${adj.toFixed(2)} (Reason: ${reason})`;
-        await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
-      } else {
-        demoStore.adjustBalanceWithAudit(userId, newBalance, reason, actor);
+        try {
+          const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+          const oldBal = Number(targetProfile?.practice_balance ?? 0);
+          const adj = newBalance - oldBal;
+          await supabase.from("profiles").update({ practice_balance: newBalance }).eq("id", userId);
+          const actionDesc = `Balance Adjustment: Old=$${oldBal.toFixed(2)}, New=$${newBalance.toFixed(2)}, Adj=$${adj >= 0 ? "+" : ""}$${adj.toFixed(2)} (Reason: ${reason})`;
+          await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
+          window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance } }));
+        } catch (e) {
+          console.warn("Supabase balance adjust sync:", e);
+        }
       }
       await load();
     },
@@ -210,20 +309,33 @@ export function useAdminData() {
     async (userId: string, amount: number, payoutType: string, reason: string) => {
       const actor = user?.email ?? "admin";
       if (!amount || amount <= 0) throw new Error("Profit amount must be greater than zero.");
+
+      // Record in local store
+      demoStore.creditProfitWithAudit(userId, amount, payoutType, reason, actor);
+
       if (isSupabaseConfigured && supabase) {
-        const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
-        const oldBal = targetProfile?.practice_balance ?? 0;
-        const newBal = oldBal + amount;
-        await supabase.from("profiles").update({ practice_balance: newBal }).eq("id", userId);
-        await supabase.from("activities").insert({
-          user_id: userId,
-          type: "profit",
-          message: `Profit Payout: +$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credited (${payoutType}${reason ? ` · ${reason}` : ""})`,
-        });
-        const actionDesc = `Credited Profit: +$${amount.toFixed(2)} (${payoutType}) - Reason: ${reason}`;
-        await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
-      } else {
-        demoStore.creditProfitWithAudit(userId, amount, payoutType, reason, actor);
+        try {
+          const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+          const oldBal = Number(targetProfile?.practice_balance ?? 0);
+          const newBal = oldBal + amount;
+          await supabase.from("profiles").update({ practice_balance: newBal }).eq("id", userId);
+
+          try {
+            await supabase.from("activities").insert({
+              user_id: userId,
+              type: "profit",
+              message: `Profit Payout: +$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credited (${payoutType}${reason ? ` · ${reason}` : ""})`,
+            });
+          } catch {
+            // Activities insert might be restricted by user RLS
+          }
+
+          const actionDesc = `Credited Profit: +$${amount.toFixed(2)} (${payoutType}) - Reason: ${reason}`;
+          await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
+          window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, balance: newBal } }));
+        } catch (err) {
+          console.warn("Supabase profit credit:", err);
+        }
       }
       await load();
     },
@@ -303,51 +415,113 @@ export function useAdminData() {
       const actor = user?.email ?? "admin";
       if (!approve && !adminNote?.trim()) throw new Error("A reason is mandatory when rejecting a deposit request.");
 
+      let reviewedOnSupabase = false;
       if (isSupabaseConfigured && supabase) {
-        const { data: request } = await supabase.from("deposit_requests").select("*").eq("id", requestId).single();
-        if (!request) throw new Error("Deposit request not found.");
-        if (request.status !== "pending") throw new Error("This deposit request has already been reviewed.");
+        try {
+          const { data: request } = await supabase.from("deposit_requests").select("*").eq("id", requestId).single();
+          if (request && request.status === "pending") {
+            await supabase
+              .from("deposit_requests")
+              .update({
+                status: approve ? "approved" : "rejected",
+                admin_note: adminNote || null,
+                reviewed_at: new Date().toISOString(),
+                reviewed_by: actor,
+              })
+              .eq("id", requestId);
 
-        await supabase
-          .from("deposit_requests")
-          .update({
-            status: approve ? "approved" : "rejected",
-            admin_note: adminNote || null,
-            reviewed_at: new Date().toISOString(),
-            reviewed_by: actor,
-          })
-          .eq("id", requestId);
-
-        if (approve) {
-          const { data: profile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
-          const nextBalance = (profile?.practice_balance ?? 0) + request.amount;
-          await supabase.from("profiles").update({ practice_balance: nextBalance }).eq("id", userId);
-          await supabase.from("activities").insert({
-            user_id: userId,
-            type: "account",
-            message: `Deposit of $${request.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} approved — funds credited to your account.`,
-          });
-          await supabase.from("audit_logs").insert({
-            actor,
-            action: `Approved deposit request of $${request.amount.toFixed(2)}${adminNote ? ` (Note: ${adminNote})` : ""}`,
-            target: profile?.email ?? userId,
-          });
-          window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance: nextBalance } }));
-        } else {
-          await supabase.from("activities").insert({
-            user_id: userId,
-            type: "account",
-            message: `Deposit of $${request.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} was rejected. Reason: ${adminNote}`,
-          });
-          await supabase.from("audit_logs").insert({
-            actor,
-            action: `Rejected deposit request of $${request.amount.toFixed(2)} (Note: ${adminNote})`,
-            target: userId,
-          });
+            if (approve) {
+              const { data: profile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+              const nextBalance = Number(profile?.practice_balance ?? 0) + Number(request.amount);
+              await supabase.from("profiles").update({ practice_balance: nextBalance }).eq("id", userId);
+              try {
+                await supabase.from("activities").insert({
+                  user_id: userId,
+                  type: "account",
+                  message: `Deposit of $${Number(request.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} approved — funds credited to your account.`,
+                });
+              } catch {
+                // Ignore activity RLS issue
+              }
+              await supabase.from("audit_logs").insert({
+                actor,
+                action: `Approved deposit request of $${Number(request.amount).toFixed(2)}${adminNote ? ` (Note: ${adminNote})` : ""}`,
+                target: profile?.email ?? userId,
+              });
+              window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance: nextBalance } }));
+            } else {
+              await supabase.from("audit_logs").insert({
+                actor,
+                action: `Rejected deposit request of $${Number(request.amount).toFixed(2)} (Note: ${adminNote})`,
+                target: userId,
+              });
+            }
+            reviewedOnSupabase = true;
+          }
+        } catch (e) {
+          console.warn("Supabase deposit review fallback:", e);
         }
-      } else {
+      }
+
+      if (!reviewedOnSupabase) {
         demoStore.reviewDepositRequest(userId, requestId, approve, adminNote, actor);
       }
+
+      await load();
+    },
+    [user, load],
+  );
+
+  const reviewWithdrawal = useCallback(
+    async (userId: string, requestId: string, approve: boolean, adminNote: string | undefined) => {
+      const actor = user?.email ?? "admin";
+      if (!approve && !adminNote?.trim()) throw new Error("A reason is mandatory when rejecting a withdrawal request.");
+
+      let reviewedOnSupabase = false;
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: request } = await supabase.from("withdrawal_requests").select("*").eq("id", requestId).single();
+          if (request && request.status === "pending") {
+            await supabase
+              .from("withdrawal_requests")
+              .update({
+                status: approve ? "approved" : "rejected",
+                admin_note: adminNote || null,
+                reviewed_at: new Date().toISOString(),
+                reviewed_by: actor,
+              })
+              .eq("id", requestId);
+
+            if (!approve) {
+              // Refund held balance back to user
+              const { data: profile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+              const refundedBalance = Number(profile?.practice_balance ?? 0) + Number(request.amount);
+              await supabase.from("profiles").update({ practice_balance: refundedBalance }).eq("id", userId);
+              await supabase.from("audit_logs").insert({
+                actor,
+                action: `Rejected withdrawal request of $${Number(request.amount).toFixed(2)} (Refunded) - Reason: ${adminNote}`,
+                target: profile?.email ?? userId,
+              });
+              window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance: refundedBalance } }));
+            } else {
+              const { data: profile } = await supabase.from("profiles").select("email").eq("id", userId).single();
+              await supabase.from("audit_logs").insert({
+                actor,
+                action: `Approved and processed withdrawal of $${Number(request.amount).toFixed(2)} (${request.method})${adminNote ? ` (Note: ${adminNote})` : ""}`,
+                target: profile?.email ?? userId,
+              });
+            }
+            reviewedOnSupabase = true;
+          }
+        } catch (e) {
+          console.warn("Supabase withdrawal review fallback:", e);
+        }
+      }
+
+      if (!reviewedOnSupabase) {
+        demoStore.reviewWithdrawalRequest(userId, requestId, approve, adminNote, actor);
+      }
+
       await load();
     },
     [user, load],
@@ -359,6 +533,8 @@ export function useAdminData() {
     tickets,
     repliesByTicket,
     deposits,
+    withdrawals,
+    profitPayouts,
     auditLog,
     loading,
     setUserEnabled,
@@ -370,6 +546,7 @@ export function useAdminData() {
     addTicketReply,
     cancelOrder,
     reviewDeposit,
+    reviewWithdrawal,
     refresh: load,
   };
 }

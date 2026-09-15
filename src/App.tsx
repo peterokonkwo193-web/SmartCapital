@@ -37,6 +37,9 @@ function App() {
             <Route path="/watchlist" element={<WatchlistPage />} />
             <Route path="/paper-trading" element={<PaperTradingPage />} />
             <Route path="/deposits" element={<DepositPage />} />
+            <Route path="/transactions" element={<DepositPage />} />
+            <Route path="/withdrawals" element={<DepositPage />} />
+            <Route path="/funding" element={<DepositPage />} />
             <Route path="/traders" element={<TradersPage />} />
             <Route path="/education" element={<EducationIndexPage />} />
             <Route path="/education/stocks" element={<EducationArticlePage slugOverride="stocks" />} />
