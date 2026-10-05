@@ -217,8 +217,32 @@ export function useAdminData() {
       }
       setWithdrawals(loadedWithdrawals);
 
-      // Profits
-      setProfitPayouts(demoStore.getAllProfitPayouts());
+      // Profits: load from Supabase (falls back to local-only history if the
+      // profit_payouts migration hasn't been run on this project yet).
+      let loadedProfitPayouts: ProfitPayoutRecord[] = [];
+      try {
+        const { data: profitRows } = await client
+          .from("profit_payouts")
+          .select("*, profiles(full_name, email)")
+          .order("created_at", { ascending: false });
+
+        if (profitRows && Array.isArray(profitRows)) {
+          loadedProfitPayouts = profitRows.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            userName: row.profiles?.full_name ?? "Client",
+            userEmail: row.profiles?.email ?? "",
+            amount: Number(row.amount),
+            payoutType: row.payout_type,
+            reason: row.reason ?? "",
+            actor: row.actor,
+            createdAt: row.created_at,
+          }));
+        }
+      } catch {
+        // Table not present yet
+      }
+      setProfitPayouts(loadedProfitPayouts);
 
       setAuditLog(
         (audit ?? []).map((row: any) => ({
@@ -285,20 +309,16 @@ export function useAdminData() {
       const actor = user?.email ?? "admin";
       if (!reason.trim()) throw new Error("A reason is mandatory for balance adjustments.");
 
-      demoStore.adjustBalanceWithAudit(userId, newBalance, reason, actor);
-
       if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
-          const oldBal = Number(targetProfile?.practice_balance ?? 0);
-          const adj = newBalance - oldBal;
-          await supabase.from("profiles").update({ practice_balance: newBalance }).eq("id", userId);
-          const actionDesc = `Balance Adjustment: Old=$${oldBal.toFixed(2)}, New=$${newBalance.toFixed(2)}, Adj=$${adj >= 0 ? "+" : ""}$${adj.toFixed(2)} (Reason: ${reason})`;
-          await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
-          window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance } }));
-        } catch (e) {
-          console.warn("Supabase balance adjust sync:", e);
-        }
+        const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+        const oldBal = Number(targetProfile?.practice_balance ?? 0);
+        const adj = newBalance - oldBal;
+        await supabase.from("profiles").update({ practice_balance: newBalance }).eq("id", userId);
+        const actionDesc = `Balance Adjustment: Old=$${oldBal.toFixed(2)}, New=$${newBalance.toFixed(2)}, Adj=$${adj >= 0 ? "+" : ""}$${adj.toFixed(2)} (Reason: ${reason})`;
+        await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
+        window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, newBalance } }));
+      } else {
+        demoStore.adjustBalanceWithAudit(userId, newBalance, reason, actor);
       }
       await load();
     },
@@ -310,32 +330,35 @@ export function useAdminData() {
       const actor = user?.email ?? "admin";
       if (!amount || amount <= 0) throw new Error("Profit amount must be greater than zero.");
 
-      // Record in local store
-      demoStore.creditProfitWithAudit(userId, amount, payoutType, reason, actor);
-
       if (isSupabaseConfigured && supabase) {
+        const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
+        const oldBal = Number(targetProfile?.practice_balance ?? 0);
+        const newBal = oldBal + amount;
+        await supabase.from("profiles").update({ practice_balance: newBal }).eq("id", userId);
+
+        await supabase.from("profit_payouts").insert({
+          user_id: userId,
+          amount,
+          payout_type: payoutType,
+          reason,
+          actor,
+        });
+
         try {
-          const { data: targetProfile } = await supabase.from("profiles").select("practice_balance, email").eq("id", userId).single();
-          const oldBal = Number(targetProfile?.practice_balance ?? 0);
-          const newBal = oldBal + amount;
-          await supabase.from("profiles").update({ practice_balance: newBal }).eq("id", userId);
-
-          try {
-            await supabase.from("activities").insert({
-              user_id: userId,
-              type: "profit",
-              message: `Profit Payout: +$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credited (${payoutType}${reason ? ` · ${reason}` : ""})`,
-            });
-          } catch {
-            // Activities insert might be restricted by user RLS
-          }
-
-          const actionDesc = `Credited Profit: +$${amount.toFixed(2)} (${payoutType}) - Reason: ${reason}`;
-          await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
-          window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, balance: newBal } }));
-        } catch (err) {
-          console.warn("Supabase profit credit:", err);
+          await supabase.from("activities").insert({
+            user_id: userId,
+            type: "profit",
+            message: `Profit Payout: +$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credited (${payoutType}${reason ? ` · ${reason}` : ""})`,
+          });
+        } catch {
+          // Activities insert might be restricted by user RLS
         }
+
+        const actionDesc = `Credited Profit: +$${amount.toFixed(2)} (${payoutType}) - Reason: ${reason}`;
+        await supabase.from("audit_logs").insert({ actor, action: actionDesc, target: targetProfile?.email ?? userId });
+        window.dispatchEvent(new CustomEvent("marketcapital_balance_updated", { detail: { userId, balance: newBal } }));
+      } else {
+        demoStore.creditProfitWithAudit(userId, amount, payoutType, reason, actor);
       }
       await load();
     },

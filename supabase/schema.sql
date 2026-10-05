@@ -249,6 +249,22 @@ create index if not exists deposit_requests_user_id_idx on public.deposit_reques
 create index if not exists deposit_requests_status_idx on public.deposit_requests (status);
 
 -- ----------------------------------------------------------------------------
+-- profit_payouts — admin-credited profit/ROI history per user.
+-- ----------------------------------------------------------------------------
+create table if not exists public.profit_payouts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  amount numeric(14, 2) not null check (amount > 0),
+  payout_type text not null,
+  reason text not null default '',
+  actor text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists profit_payouts_user_id_idx on public.profit_payouts (user_id);
+create index if not exists profit_payouts_created_at_idx on public.profit_payouts (created_at desc);
+
+-- ----------------------------------------------------------------------------
 -- education_content — CMS-style backing store for /education/:slug.
 -- ----------------------------------------------------------------------------
 create table if not exists public.education_content (
@@ -444,6 +460,12 @@ create policy "deposit_requests_insert_own" on public.deposit_requests
 create policy "deposit_requests_admin_review" on public.deposit_requests
   for update using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
 
+-- profit_payouts: user reads own history; only admins credit profit.
+create policy "profit_payouts_select_own_or_admin" on public.profit_payouts
+  for select using (auth.uid() = user_id or public.has_role(auth.uid(), 'admin'));
+create policy "profit_payouts_admin_insert" on public.profit_payouts
+  for insert with check (public.has_role(auth.uid(), 'admin'));
+
 -- catalog / reference tables: public read, admin write.
 create policy "traders_public_read" on public.traders for select using (true);
 create policy "traders_admin_write" on public.traders
@@ -478,6 +500,7 @@ alter publication supabase_realtime add table public.support_tickets;
 alter publication supabase_realtime add table public.support_ticket_replies;
 alter publication supabase_realtime add table public.activities;
 alter publication supabase_realtime add table public.deposit_requests;
+alter publication supabase_realtime add table public.profit_payouts;
 
 -- ============================================================================
 -- Storage: a private bucket for user-uploaded deposit proof images. Each
