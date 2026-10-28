@@ -103,6 +103,7 @@ export interface SupportTicketReply {
   id: string;
   ticketId: string;
   authorName: string;
+  authorIsAdmin: boolean;
   message: string;
   isInternal: boolean;
   createdAt: string;

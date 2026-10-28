@@ -334,6 +334,7 @@ export function addTicketReply(
   message: string,
   isInternal: boolean,
   authorName: string,
+  authorIsAdmin = true,
 ): SupportTicketReply {
   const data = getUserData(userId);
   if (!data) throw new Error("User not found.");
@@ -343,6 +344,7 @@ export function addTicketReply(
     id: crypto.randomUUID(),
     ticketId,
     authorName,
+    authorIsAdmin,
     message,
     isInternal,
     createdAt: new Date().toISOString(),

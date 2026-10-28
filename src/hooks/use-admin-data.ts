@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import * as demoStore from "@/lib/demo-store";
@@ -51,6 +52,8 @@ export function useAdminData() {
   const [profitPayouts, setProfitPayouts] = useState<ProfitPayoutRecord[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const seenReplyIds = useRef<Set<string> | null>(null);
+  const seenTicketIds = useRef<Set<string> | null>(null);
 
   const load = useCallback(async () => {
     if (isSupabaseConfigured && supabase) {
@@ -66,7 +69,7 @@ export function useAdminData() {
         client.from("profiles").select("*").order("created_at", { ascending: false }),
         client.from("paper_trades").select("*, profiles(full_name)"),
         client.from("support_tickets").select("*, profiles(full_name, email)"),
-        client.from("support_ticket_replies").select("*, profiles(full_name)").order("created_at", { ascending: true }),
+        client.from("support_ticket_replies").select("*, profiles(full_name, role)").order("created_at", { ascending: true }),
         client.from("deposit_requests").select("*, profiles(full_name, email)").order("created_at", { ascending: false }),
         client.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(100),
       ]);
@@ -103,21 +106,20 @@ export function useAdminData() {
         })),
       );
 
-      setTickets(
-        (supportTickets ?? []).map((row: any) => ({
-          userId: row.user_id,
-          userName: row.profiles?.full_name ?? "Unknown",
-          userEmail: row.profiles?.email ?? "",
-          ticket: {
-            id: row.id,
-            subject: row.subject,
-            message: row.message,
-            status: row.status,
-            category: row.category,
-            createdAt: row.created_at,
-          },
-        })),
-      );
+      const mappedTickets: AdminTicketRow[] = (supportTickets ?? []).map((row: any) => ({
+        userId: row.user_id,
+        userName: row.profiles?.full_name ?? "Unknown",
+        userEmail: row.profiles?.email ?? "",
+        ticket: {
+          id: row.id,
+          subject: row.subject,
+          message: row.message,
+          status: row.status,
+          category: row.category,
+          createdAt: row.created_at,
+        },
+      }));
+      setTickets(mappedTickets);
 
       const grouped: Record<string, SupportTicketReply[]> = {};
       for (const row of replyRows ?? []) {
@@ -125,6 +127,7 @@ export function useAdminData() {
           id: row.id,
           ticketId: row.ticket_id,
           authorName: (row as any).profiles?.full_name ?? "Support Team",
+          authorIsAdmin: (row as any).profiles?.role === "admin",
           message: row.message,
           isInternal: row.is_internal,
           createdAt: row.created_at,
@@ -132,6 +135,31 @@ export function useAdminData() {
         (grouped[reply.ticketId] ??= []).push(reply);
       }
       setRepliesByTicket(grouped);
+
+      // Notify the admin (toast, not on first load) of new tickets and new
+      // user replies on existing ones, so support activity isn't missed.
+      const isFirstLoad = seenTicketIds.current === null;
+      if (seenTicketIds.current === null) seenTicketIds.current = new Set();
+      if (seenReplyIds.current === null) seenReplyIds.current = new Set();
+
+      for (const row of mappedTickets) {
+        if (!seenTicketIds.current.has(row.ticket.id)) {
+          seenTicketIds.current.add(row.ticket.id);
+          if (!isFirstLoad) {
+            toast.message(`New ticket from ${row.userName}`, { description: row.ticket.subject });
+          }
+        }
+      }
+      for (const replies of Object.values(grouped)) {
+        for (const reply of replies) {
+          if (!seenReplyIds.current.has(reply.id)) {
+            seenReplyIds.current.add(reply.id);
+            if (!isFirstLoad && !reply.isInternal && !reply.authorIsAdmin) {
+              toast.message(`New message from ${reply.authorName}`, { description: reply.message });
+            }
+          }
+        }
+      }
 
       // Deposits: process Supabase results or combine with local
       let loadedDeposits: AdminDepositRow[] = [];
@@ -274,6 +302,18 @@ export function useAdminData() {
   useEffect(() => {
     setLoading(true);
     load();
+
+    if (isSupabaseConfigured && supabase) {
+      const client = supabase;
+      const channel = client
+        .channel("admin-support")
+        .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "support_ticket_replies" }, load)
+        .subscribe();
+      return () => {
+        client.removeChannel(channel);
+      };
+    }
   }, [load]);
 
   const setUserEnabled = useCallback(

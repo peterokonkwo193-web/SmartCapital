@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useSupportTickets } from "@/hooks/use-support-tickets";
 import { supportTicketSchema, type SupportTicketInput } from "@/lib/validation";
 import { formatDateTime } from "@/utils/format";
+import type { SupportTicket, SupportTicketReply } from "@/types";
+import { Send } from "lucide-react";
 
 const FAQ = [
   { question: "Is this a real trading platform?", answer: "Yes. SmartCapital is a live trading platform where you can buy and sell real financial assets. All orders are executed against real market prices." },
@@ -33,7 +35,7 @@ const TICKET_STATUS_VARIANT = { open: "warning", in_progress: "accent", pending:
 function SupportPage() {
   const [query, setQuery] = useState("");
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
-  const { tickets, repliesByTicket, loading } = useSupportTickets();
+  const { tickets, repliesByTicket, loading, replyToTicket } = useSupportTickets();
 
   useEffect(() => {
     document.title = "Support — SmartCapital";
@@ -122,49 +124,108 @@ function SupportPage() {
       <Card>
         <CardHeader>
           <CardTitle>Ticket History</CardTitle>
-          <CardDescription>Your previously submitted support requests.</CardDescription>
+          <CardDescription>Your previously submitted support requests — reply any time to keep the conversation going.</CardDescription>
         </CardHeader>
         <CardContent>
           {!loading && tickets.length === 0 ? (
             <EmptyState icon={Ticket} title="No support tickets" description="Tickets you open will appear here with their status." />
           ) : (
             <div className="divide-y divide-border">
-              {tickets.map((ticket) => {
-                const replies = repliesByTicket[ticket.id] ?? [];
-                return (
-                  <div key={ticket.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{ticket.subject}</p>
-                        <p className="mt-0.5 line-clamp-2 max-w-lg text-sm text-muted-foreground">{ticket.message}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {ticket.category} · {formatDateTime(ticket.createdAt)}
-                        </p>
-                      </div>
-                      <Badge variant={TICKET_STATUS_VARIANT[ticket.status]} className="shrink-0 capitalize">
-                        {ticket.status}
-                      </Badge>
-                    </div>
-
-                    {replies.length > 0 && (
-                      <div className="mt-3 space-y-2 border-l-2 border-primary/30 pl-3.5">
-                        {replies.map((reply) => (
-                          <div key={reply.id}>
-                            <p className="text-xs font-medium text-foreground">
-                              {reply.authorName} <span className="font-normal text-muted-foreground">· {formatDateTime(reply.createdAt)}</span>
-                            </p>
-                            <p className="text-sm leading-relaxed text-muted-foreground">{reply.message}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {tickets.map((ticket) => (
+                <TicketConversation
+                  key={ticket.id}
+                  ticket={ticket}
+                  replies={repliesByTicket[ticket.id] ?? []}
+                  onReply={replyToTicket}
+                />
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function TicketConversation({
+  ticket,
+  replies,
+  onReply,
+}: {
+  ticket: SupportTicket;
+  replies: SupportTicketReply[];
+  onReply: (ticketId: string, message: string) => Promise<void>;
+}) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      await onReply(ticket.id, message.trim());
+      setMessage("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send message.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-foreground">{ticket.subject}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {ticket.category} · {formatDateTime(ticket.createdAt)}
+          </p>
+        </div>
+        <Badge variant={TICKET_STATUS_VARIANT[ticket.status]} className="shrink-0 capitalize">
+          {ticket.status}
+        </Badge>
+      </div>
+
+      <div className="mt-3 space-y-2.5">
+        <div className="max-w-[85%] rounded-lg rounded-tl-sm bg-muted/60 px-3 py-2">
+          <p className="text-xs font-medium text-foreground">You · <span className="font-normal text-muted-foreground">{formatDateTime(ticket.createdAt)}</span></p>
+          <p className="mt-0.5 text-sm leading-relaxed text-foreground">{ticket.message}</p>
+        </div>
+
+        {replies.map((reply) => (
+          <div
+            key={reply.id}
+            className={`max-w-[85%] rounded-lg px-3 py-2 ${
+              reply.authorIsAdmin ? "ml-auto rounded-tr-sm bg-primary/10" : "rounded-tl-sm bg-muted/60"
+            }`}
+          >
+            <p className="text-xs font-medium text-foreground">
+              {reply.authorIsAdmin ? reply.authorName : "You"}{" "}
+              <span className="font-normal text-muted-foreground">· {formatDateTime(reply.createdAt)}</span>
+            </p>
+            <p className="mt-0.5 text-sm leading-relaxed text-foreground">{reply.message}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-end gap-2">
+        <Textarea
+          placeholder="Write a message to support…"
+          rows={1}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          className="min-h-9 resize-none py-2"
+        />
+        <Button size="icon" onClick={handleSend} disabled={sending || !message.trim()} className="shrink-0">
+          <Send className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }

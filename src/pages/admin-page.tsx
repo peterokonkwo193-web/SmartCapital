@@ -93,17 +93,25 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
     const totalBalance = users.reduce((sum, u) => sum + u.practiceBalance, 0);
     const totalProfits = profitPayouts.reduce((sum, p) => sum + p.amount, 0);
     const pendingWithdrawals = withdrawals.filter((w) => w.request.status === "pending").length;
+    const ticketsNeedingReply = tickets.filter(({ ticket }) => {
+      if (ticket.status === "closed") return false;
+      if (ticket.status === "open") return true;
+      const replies = repliesByTicket[ticket.id] ?? [];
+      const lastReply = replies.filter((r) => !r.isInternal).at(-1);
+      return Boolean(lastReply && !lastReply.authorIsAdmin);
+    }).length;
     return {
       totalUsers: users.length,
       activeUsers,
       totalOrders: orders.length,
       totalBalance,
       openTickets: tickets.filter((t) => t.ticket.status !== "resolved" && t.ticket.status !== "closed").length,
+      ticketsNeedingReply,
       pendingDeposits: deposits.filter((d) => d.request.status === "pending").length,
       pendingWithdrawals,
       totalProfits,
     };
-  }, [users, orders, tickets, deposits, withdrawals, profitPayouts]);
+  }, [users, orders, tickets, repliesByTicket, deposits, withdrawals, profitPayouts]);
 
   return (
     <div className="space-y-6">
@@ -126,33 +134,42 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 flex-wrap">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="deposits" className="relative">
-            Deposits
-            {stats.pendingDeposits > 0 && (
-              <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-warning text-[10px] font-bold text-warning-foreground">
-                {stats.pendingDeposits}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="withdrawals" className="relative">
-            Withdrawals
-            {stats.pendingWithdrawals > 0 && (
-              <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                {stats.pendingWithdrawals}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="profits">
-            Profits & ROI
-          </TabsTrigger>
-          <TabsTrigger value="trades">Live Trades</TabsTrigger>
-          <TabsTrigger value="market-data">Market Data</TabsTrigger>
-          <TabsTrigger value="education">Education CMS</TabsTrigger>
-          <TabsTrigger value="support">Support Tickets</TabsTrigger>
-          <TabsTrigger value="audit">Audit Trail</TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-1 no-scrollbar mb-6">
+          <TabsList className="inline-flex h-11 w-max justify-start gap-1 p-1">
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="deposits" className="relative">
+              Deposits
+              {stats.pendingDeposits > 0 && (
+                <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-warning text-[10px] font-bold text-warning-foreground">
+                  {stats.pendingDeposits}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals" className="relative">
+              Withdrawals
+              {stats.pendingWithdrawals > 0 && (
+                <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                  {stats.pendingWithdrawals}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="profits">
+              Profits & ROI
+            </TabsTrigger>
+            <TabsTrigger value="trades">Live Trades</TabsTrigger>
+            <TabsTrigger value="market-data">Market Data</TabsTrigger>
+            <TabsTrigger value="education">Education CMS</TabsTrigger>
+            <TabsTrigger value="support" className="relative">
+              Support Tickets
+              {stats.ticketsNeedingReply > 0 && (
+                <span className="ml-1.5 inline-flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                  {stats.ticketsNeedingReply}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="users">
           <UsersTab
@@ -2007,7 +2024,7 @@ function TicketDetailDialog({
         </DialogHeader>
 
         <div className="max-h-[50vh] space-y-3 overflow-y-auto rounded-md border border-border bg-muted/30 p-3">
-          <div className="rounded-md bg-surface p-3 text-sm">
+          <div className="max-w-[85%] rounded-md bg-surface p-3 text-sm">
             <p className="mb-1 text-xs font-medium text-muted-foreground">{userName} (ticket opener)</p>
             <p className="leading-relaxed text-foreground">{ticket.message}</p>
           </div>
@@ -2015,7 +2032,13 @@ function TicketDetailDialog({
           {replies.map((reply) => (
             <div
               key={reply.id}
-              className={`rounded-md p-3 text-sm ${reply.isInternal ? "border border-dashed border-warning/50 bg-warning/10" : "bg-primary/10"}`}
+              className={`max-w-[85%] rounded-md p-3 text-sm ${
+                reply.isInternal
+                  ? "border border-dashed border-warning/50 bg-warning/10"
+                  : reply.authorIsAdmin
+                  ? "ml-auto bg-primary/10"
+                  : "bg-surface"
+              }`}
             >
               <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 {reply.authorName}

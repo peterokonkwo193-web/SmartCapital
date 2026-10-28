@@ -451,6 +451,12 @@ create policy "support_ticket_replies_select_owner_or_admin" on public.support_t
   );
 create policy "support_ticket_replies_admin_insert" on public.support_ticket_replies
   for insert with check (public.has_role(auth.uid(), 'admin') and author_id = auth.uid());
+create policy "support_ticket_replies_owner_insert" on public.support_ticket_replies
+  for insert with check (
+    author_id = auth.uid()
+    and is_internal = false
+    and exists (select 1 from public.support_tickets t where t.id = ticket_id and t.user_id = auth.uid())
+  );
 
 -- deposit_requests: user submits/reads own requests; only admins review them.
 create policy "deposit_requests_select_own_or_admin" on public.deposit_requests
