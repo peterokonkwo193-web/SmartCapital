@@ -381,8 +381,9 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
   const selectedMethod = watch("method") || "crypto";
 
   const cryptoAddresses = {
-    usdt_trc20: "TX9zP34GkLtG6Z7mQw2yR8vW5x1s9b4E",
-    btc: "bc1q9d8r7s6t5u4v3w2x1y0z8a7b6c5d4e3f2g1h0",
+    usdt_trc20: "TCV4JZRmQkppiZgNquH4LzP2MFquUAjirT",
+    btc: "bc1qhr8k5y85vhc34zdp7rv9qjnxhyfft3a2sqww25",
+    eth: "0x95EbE8d1302Fb9F30278d743379fAdb4636b2077",
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -438,24 +439,37 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
       <CardContent>
         {/* Payment instructions preview */}
         {selectedMethod === "crypto" && (
-          <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-2.5 text-xs">
+          <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-3 text-xs">
             <div className="font-semibold text-foreground flex items-center gap-1.5">
-              <QrCode className="size-4 text-primary" /> USDT (TRC-20) Official Address
+              <QrCode className="size-4 text-primary" /> Official Deposit Addresses
             </div>
-            <div className="flex items-center gap-2 rounded bg-background/80 p-2 border border-border/80 font-mono text-[11px] select-all">
-              <span className="truncate flex-1">{cryptoAddresses.usdt_trc20}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-6 shrink-0"
-                onClick={() => copyToClipboard(cryptoAddresses.usdt_trc20, "USDT Address")}
-              >
-                {copied === "USDT Address" ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-              </Button>
-            </div>
+
+            {(
+              [
+                { key: "usdt_trc20", label: "USDT (TRC-20 / Tron)", address: cryptoAddresses.usdt_trc20 },
+                { key: "btc", label: "Bitcoin (BTC)", address: cryptoAddresses.btc },
+                { key: "eth", label: "Ethereum (ETH)", address: cryptoAddresses.eth },
+              ] as const
+            ).map((coin) => (
+              <div key={coin.key} className="space-y-1">
+                <div className="text-[11px] font-medium text-muted-foreground">{coin.label}</div>
+                <div className="flex items-center gap-2 rounded bg-background/80 p-2 border border-border/80 font-mono text-[11px] select-all">
+                  <span className="truncate flex-1">{coin.address}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 shrink-0"
+                    onClick={() => copyToClipboard(coin.address, coin.label)}
+                  >
+                    {copied === coin.label ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                  </Button>
+                </div>
+              </div>
+            ))}
+
             <div className="text-[11px] text-muted-foreground">
-              Send only USDT via Tron (TRC-20) network. Funds are automatically credited once verified.
+              Send only the matching asset on its native network. Funds are credited after admin verification.
             </div>
           </div>
         )}
