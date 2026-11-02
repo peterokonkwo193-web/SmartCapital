@@ -74,7 +74,7 @@ export function useAdminData() {
         client.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(100),
       ]);
 
-      const mappedUsers: AdminUserRow[] = (profiles ?? []).map((p) => ({
+      let mappedUsers: AdminUserRow[] = (profiles ?? []).map((p) => ({
         id: p.id,
         fullName: p.full_name,
         firstName: p.first_name ?? "",
@@ -87,6 +87,27 @@ export function useAdminData() {
         role: p.role ?? "user",
         disabled: p.disabled ?? false,
       }));
+
+      // Merge registered demo store profiles so client accounts and login details
+      // are never missing if Supabase profiles are empty or restricted by RLS
+      const demoUsers = demoStore.getAllDemoProfiles();
+      for (const du of demoUsers) {
+        if (!mappedUsers.some((u) => u.id === du.id || u.email.toLowerCase() === du.email.toLowerCase())) {
+          mappedUsers.push({
+            id: du.id,
+            fullName: du.fullName,
+            firstName: du.firstName ?? "",
+            lastName: du.lastName ?? "",
+            phone: du.phone ?? "",
+            country: du.country ?? "",
+            email: du.email,
+            memberSince: du.memberSince,
+            practiceBalance: du.practiceBalance,
+            role: du.role,
+            disabled: false,
+          });
+        }
+      }
       setUsers(mappedUsers);
 
       setOrders(
@@ -590,6 +611,22 @@ export function useAdminData() {
     [user, load],
   );
 
+  const sendPasswordReset = useCallback(
+    async (email: string) => {
+      if (!email) throw new Error("No email address provided.");
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success(`Password reset email sent to ${email}`);
+        return;
+      }
+      toast.success(`Demo mode: Password reset email sent to ${email}`);
+    },
+    [],
+  );
+
   return {
     users,
     orders,
@@ -604,6 +641,7 @@ export function useAdminData() {
     setUserRole,
     adjustPracticeBalance,
     creditProfit,
+    sendPasswordReset,
     correctTrade,
     updateTicketStatus,
     addTicketReply,

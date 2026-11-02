@@ -7,6 +7,7 @@ import { PaperTradingProvider } from "@/hooks/paper-trading-provider";
 
 import { LiveMarketProvider } from "@/hooks/live-market-provider";
 import { LiveTickerTape } from "@/components/markets/live-ticker-tape";
+import { CustomerServiceWidget } from "@/components/common/customer-service-widget";
 
 function AppShell() {
   return (
@@ -24,6 +25,7 @@ function AppShell() {
           </div>
 
           <BottomNav />
+          <CustomerServiceWidget />
         </div>
       </PaperTradingProvider>
     </LiveMarketProvider>

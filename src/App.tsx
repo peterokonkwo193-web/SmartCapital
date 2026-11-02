@@ -49,6 +49,7 @@ function App() {
             <Route path="/education/:slug" element={<EducationArticlePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/support" element={<SupportPage />} />
+            <Route path="/customer-service" element={<SupportPage />} />
 
             <Route element={<AdminRoute />}>
               <Route path="/admin" element={<AdminPage />} />

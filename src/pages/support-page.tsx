@@ -38,7 +38,7 @@ function SupportPage() {
   const { tickets, repliesByTicket, loading, replyToTicket } = useSupportTickets();
 
   useEffect(() => {
-    document.title = "Support — SmartCapital";
+    document.title = "Customer Service — SmartCapital";
   }, []);
 
   const filteredFaq = useMemo(() => {
@@ -49,7 +49,7 @@ function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Support" description="Find answers or reach out — we're here to help." />
+      <PageHeader title="Customer Service & Support" description="24/7 client assistance, instant live chat, and support ticket desk." />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

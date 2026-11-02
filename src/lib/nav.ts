@@ -6,7 +6,7 @@ import {
   Star,
   Users,
   GraduationCap,
-  LifeBuoy,
+  Headphones,
   Banknote,
   type LucideIcon,
 } from "lucide-react";
@@ -26,7 +26,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "Watchlist", href: "/watchlist", icon: Star },
   { label: "Trader Strategies", href: "/traders", icon: Users },
   { label: "Education", href: "/education", icon: GraduationCap },
-  { label: "Support", href: "/support", icon: LifeBuoy },
+  { label: "Customer Service", href: "/support", icon: Headphones },
 ];
 
 export const MOBILE_TAB_NAV: NavItem[] = [
