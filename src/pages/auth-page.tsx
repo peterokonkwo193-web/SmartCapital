@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { BrandLockup } from "@/components/common/brand-mark";
+import { LanguageSelector } from "@/components/common/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +48,10 @@ function AuthPage() {
       <div className="grid min-h-screen lg:grid-cols-2">
         <BrandPanel />
 
-        <div className="flex items-center justify-center px-6 py-12 sm:px-10">
+        <div className="relative flex items-center justify-center px-6 py-12 sm:px-10">
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+            <LanguageSelector variant="outline" showLabel />
+          </div>
           <div className="w-full max-w-sm">
             <div className="mb-8 flex justify-center lg:hidden">
               <BrandLockup />
