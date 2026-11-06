@@ -1,5 +1,6 @@
 import { BrandLockup } from "@/components/common/brand-mark";
 import { ThemeToggle } from "@/components/common/theme-toggle";
+import { LanguageSelector } from "@/components/common/language-selector";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { SidebarUserMenu } from "@/components/layout/sidebar-user-menu";
 import { Separator } from "@/components/ui/separator";
@@ -15,12 +16,17 @@ function Sidebar() {
         <SidebarNav />
       </div>
 
-      <div className="px-3 pb-3">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <span className="text-xs font-medium text-sidebar-muted">Appearance</span>
-          <ThemeToggle variant="sidebar" />
+      <div className="px-3 pb-3 space-y-2">
+        <div className="space-y-1.5 px-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-sidebar-muted">Appearance</span>
+            <ThemeToggle variant="sidebar" />
+          </div>
+          <div className="pt-1">
+            <LanguageSelector variant="sidebar" />
+          </div>
         </div>
-        <Separator className="mb-2 bg-sidebar-border" />
+        <Separator className="bg-sidebar-border" />
         <SidebarUserMenu />
       </div>
     </aside>

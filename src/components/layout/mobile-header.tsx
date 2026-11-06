@@ -4,6 +4,7 @@ import { Menu, LogOut, User as UserIcon, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { BrandLockup } from "@/components/common/brand-mark";
+import { LanguageSelector } from "@/components/common/language-selector";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -61,6 +62,10 @@ function MobileHeader() {
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-medium text-sidebar-muted">Appearance</span>
                 <ThemeToggle variant="sidebar" />
+              </div>
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-medium text-sidebar-muted">Language</span>
+                <LanguageSelector variant="header" />
               </div>
               <Link
                 to="/profile"

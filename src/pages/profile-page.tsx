@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
+import { LanguageSelector } from "@/components/common/language-selector";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { Spinner } from "@/components/common/spinner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -286,9 +287,20 @@ function PreferencesTab() {
   const [confirmOrders, setConfirmOrders] = useState(true);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Trading Preferences</CardTitle>
+    <div className="space-y-5">
+      <Card>
+        <CardHeader>
+          <CardTitle>Display Language</CardTitle>
+          <CardDescription>Choose the language for the entire platform interface.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector variant="profile" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Trading Preferences</CardTitle>
         <CardDescription>Defaults applied to your live trading order form.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -324,6 +336,7 @@ function PreferencesTab() {
         <Button onClick={() => toast.success("Preferences saved")}>Save Preferences</Button>
       </CardFooter>
     </Card>
+    </div>
   );
 }
 
