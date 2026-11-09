@@ -31,7 +31,7 @@ function PaperTradingPage() {
   const [closingSymbol, setClosingSymbol] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = "Live Trading — FXoptions";
+    document.title = "Live Trading FXoptions";
   }, []);
 
   const liveAssetMap = useMemo(() => {
@@ -76,7 +76,7 @@ function PaperTradingPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader title="Live Trading Engine" description="Real-time order execution & live portfolio tracking — powered by live market data." />
+        <PageHeader title="Live Trading Engine" description="Real time order execution and live portfolio tracking powered by live market data." />
         <PaperTradingBanner />
       </div>
 
@@ -136,7 +136,7 @@ function PaperTradingPage() {
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <div className="space-y-1.5">
                 <CardTitle>Live Portfolio Performance</CardTitle>
-                <CardDescription>Real-time performance graph based on live market prices.</CardDescription>
+                <CardDescription>Real time performance graph based on live market prices.</CardDescription>
               </div>
             </CardHeader>
             <CardContent>

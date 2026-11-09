@@ -90,7 +90,7 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
   }, [initialTab]);
 
   useEffect(() => {
-    document.title = "Admin — FXoptions Enterprise";
+    document.title = "Admin FXoptions Enterprise";
   }, []);
 
   const stats = useMemo(() => {
@@ -410,7 +410,7 @@ function UsersTab({
                           </button>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{u.phone || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{u.phone || "None"}</TableCell>
                       <TableCell>
                         <div className="flex flex-col text-xs">
                           <span className="text-foreground flex items-center gap-1">
@@ -1834,7 +1834,7 @@ function DistributeProfitModal({
               <SelectContent>
                 {users.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.fullName} ({u.email}) — Balance: {formatCurrency(u.practiceBalance)}
+                    {u.fullName} ({u.email}) Balance: {formatCurrency(u.practiceBalance)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2118,7 +2118,7 @@ function MarketDataTab() {
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="size-4" /> Market Feed Management
           </CardTitle>
-          <CardDescription>Live asset quotes streamed from real-time market feeds.</CardDescription>
+          <CardDescription>Live asset quotes streamed from real time market feeds.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -2217,7 +2217,7 @@ function SupportTab({
           Customer Service & Live Inquiries Hub
         </CardTitle>
         <CardDescription>
-          Live two-way customer service communications, client inquiry threads, and real-time response center.
+          Live two way customer service communications, client inquiry threads, and real time response center.
         </CardDescription>
       </CardHeader>
       <CardContent>

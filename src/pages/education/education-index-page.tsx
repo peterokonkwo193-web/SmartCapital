@@ -7,14 +7,14 @@ import { EDUCATION_ARTICLES } from "@/data/education";
 
 function EducationIndexPage() {
   useEffect(() => {
-    document.title = "Education — SmartCapital";
+    document.title = "Education FXoptions";
   }, []);
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Education"
-        description="Editorial, jargon-free explainers on how major asset classes actually work — written to inform, not to sell."
+        description="Editorial, jargon free explainers on how major asset classes actually work, written to inform, not to sell."
       />
 
       <div className="grid gap-5 sm:grid-cols-2">

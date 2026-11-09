@@ -11,7 +11,7 @@ export const TESTIMONIALS: Testimonial[] = [
     country: "Nigeria",
     initials: "AC",
     quote:
-      "FXoptions gave me the institutional-grade execution and live market tools I needed to trade global equities with total confidence.",
+      "FXoptions gave me the institutional grade execution and live market tools I needed to trade global equities with total confidence.",
   },
   {
     name: "Liam O'Sullivan",
@@ -25,14 +25,14 @@ export const TESTIMONIALS: Testimonial[] = [
     country: "Brazil",
     initials: "SA",
     quote:
-      "The real-time market data combined with top trader strategies helped me diversify across crypto and global assets seamlessly.",
+      "The real time market data combined with top trader strategies helped me diversify across crypto and global assets seamlessly.",
   },
   {
     name: "Wei Zhang",
     country: "Singapore",
     initials: "WZ",
     quote:
-      "Clean interface, real-time market execution, and powerful account management. FXoptions delivers everything I expect from a premier trading platform.",
+      "Clean interface, real time market execution, and powerful account management. FXoptions delivers everything I expect from a premier trading platform.",
   },
   {
     name: "Priya Nair",

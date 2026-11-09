@@ -19,7 +19,7 @@ function PortfolioPage() {
   const { orders, balance } = usePaperTrading();
 
   useEffect(() => {
-    document.title = "Portfolio — FXoptions";
+    document.title = "Portfolio FXoptions";
   }, []);
 
   const summary = useMemo(() => {
@@ -33,7 +33,7 @@ function PortfolioPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader title="Live Portfolio" description="A detailed real-time breakdown of your live holdings and mark-to-market performance." />
+        <PageHeader title="Live Portfolio" description="A detailed real time breakdown of your live holdings and mark to market performance." />
         <PaperTradingBanner />
       </div>
 

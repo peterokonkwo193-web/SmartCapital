@@ -79,7 +79,7 @@ export default function FundingPage() {
   const { transactions, loading: historyLoading } = useFundingHistory();
 
   useEffect(() => {
-    document.title = "Transactions & Funding — FXoptions";
+    document.title = "Transactions & Funding FXoptions";
   }, []);
 
   const handleTabChange = (val: string) => {
@@ -244,11 +244,11 @@ export default function FundingPage() {
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/40 p-3.5 text-xs text-muted-foreground space-y-1">
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
-                    <ShieldCheck className="size-4 text-emerald-500" /> Real-time Execution & Escrow Protection
+                    <ShieldCheck className="size-4 text-emerald-500" /> Real time Execution & Escrow Protection
                   </div>
                   <p>
                     All deposits are processed through automated blockchain verification or institutional wire reconciliation.
-                    Withdrawals are reviewed and disbursed within 15–60 minutes.
+                    Withdrawals are reviewed and disbursed within 15 to 60 minutes.
                   </p>
                 </div>
               </CardContent>
@@ -702,7 +702,7 @@ function WithdrawalForm({
         note: values.note,
       });
       toast.success("Withdrawal request submitted!", {
-        description: "Your withdrawal will be processed by administration within 15–60 minutes.",
+        description: "Your withdrawal will be processed by administration within 15 to 60 minutes.",
       });
       reset({ amount: undefined, method: "crypto", destinationDetails: "", note: "" });
     } catch (err) {

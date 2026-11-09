@@ -26,8 +26,8 @@ const FAQ = [
   { question: "Where does market data come from?", answer: "Prices are streamed in real time from Binance WebSocket (crypto) and live market data feeds. All quotes reflect actual current market conditions." },
   { question: "How do I fund my account?", answer: "Go to the Deposits page, choose your preferred payment method (bank transfer, card, or crypto), and submit a deposit request. Our team will confirm it promptly." },
   { question: "Can I lose money trading?", answer: "Yes. Trading real assets involves financial risk. You may lose some or all of the funds you deposit. Only invest what you can afford to lose." },
-  { question: "How do I withdraw my profits?", answer: "Contact support to initiate a withdrawal. Withdrawals are processed within 1-3 business days depending on the method." },
-  { question: "Is my account data secure?", answer: "Yes — authentication is handled securely. Your financial credentials and account data are encrypted and protected." },
+  { question: "How do I withdraw my profits?", answer: "Contact support to initiate a withdrawal. Withdrawals are processed within 1 to 3 business days depending on the method." },
+  { question: "Is my account data secure?", answer: "Yes, authentication is handled securely. Your financial credentials and account data are encrypted and protected." },
 ];
 
 const TICKET_STATUS_VARIANT = { open: "warning", in_progress: "accent", pending: "secondary", resolved: "success", closed: "outline" } as const;
@@ -38,7 +38,7 @@ function SupportPage() {
   const { tickets, repliesByTicket, loading, replyToTicket } = useSupportTickets();
 
   useEffect(() => {
-    document.title = "Customer Service — FXoptions";
+    document.title = "Customer Service FXoptions";
   }, []);
 
   const filteredFaq = useMemo(() => {
@@ -124,7 +124,7 @@ function SupportPage() {
       <Card>
         <CardHeader>
           <CardTitle>Ticket History</CardTitle>
-          <CardDescription>Your previously submitted support requests — reply any time to keep the conversation going.</CardDescription>
+          <CardDescription>Your previously submitted support requests. Reply any time to keep the conversation going.</CardDescription>
         </CardHeader>
         <CardContent>
           {!loading && tickets.length === 0 ? (

@@ -32,7 +32,7 @@ function MarketsPage() {
   const { items, toggle } = useWatchlist();
 
   useEffect(() => {
-    document.title = "Markets — FXoptions Live Quotes";
+    document.title = "Markets FXoptions Live Quotes";
   }, []);
 
   const watchlistSymbols = useMemo(() => new Set(items.map((i) => i.symbol)), [items]);

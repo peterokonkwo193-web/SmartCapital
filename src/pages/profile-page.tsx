@@ -30,7 +30,7 @@ function ProfilePage() {
   const initialTab = params.get("tab") ?? "profile";
 
   useEffect(() => {
-    document.title = "Profile — FXoptions";
+    document.title = "Profile FXoptions";
   }, []);
 
   return (

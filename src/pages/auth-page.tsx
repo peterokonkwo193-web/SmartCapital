@@ -90,14 +90,14 @@ function BrandPanel() {
           Trade markets. Grow your wealth.
         </h1>
         <p className="text-[15px] leading-relaxed text-sidebar-muted">
-          FXoptions gives you institutional-grade live market data and real order execution — so you can
+          FXoptions gives you institutional grade live market data and real order execution so you can
           trade real assets with confidence.
         </p>
 
         <ul className="space-y-3.5 pt-2">
-          <FeatureRow icon={TrendingUp} text="Live-style market snapshots across stocks, crypto, ETFs, and more" />
-          <FeatureRow icon={ShieldCheck} text="Secure, real-money live trading with transparent execution" />
-          <FeatureRow icon={GraduationCap} text="Editorial-grade education on how each asset class actually works" />
+          <FeatureRow icon={TrendingUp} text="Live style market snapshots across stocks, crypto, ETFs, and more" />
+          <FeatureRow icon={ShieldCheck} text="Secure, real money live trading with transparent execution" />
+          <FeatureRow icon={GraduationCap} text="Editorial grade education on how each asset class actually works" />
         </ul>
       </div>
 
@@ -287,9 +287,9 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       const { needsEmailConfirmation } = await signUp(values);
       if (needsEmailConfirmation) {
-        toast.success("Account created — check your email to confirm before logging in");
+        toast.success("Account created, check your email to confirm before logging in");
       } else {
-        toast.success("Account created — welcome to FXoptions");
+        toast.success("Account created, welcome to FXoptions");
       }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to create your account.");

@@ -20,7 +20,7 @@ function DashboardPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    document.title = "Dashboard — FXoptions";
+    document.title = "Dashboard FXoptions";
   }, []);
 
   const firstName = user?.fullName?.split(" ")[0] ?? "there";

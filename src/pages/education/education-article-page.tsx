@@ -12,7 +12,7 @@ function EducationArticlePage({ slugOverride }: { slugOverride?: string }) {
   const article = getEducationArticle(activeSlug);
 
   useEffect(() => {
-    if (article) document.title = `${article.title} — Education — SmartCapital`;
+    if (article) document.title = `${article.title} Education FXoptions`;
   }, [article]);
 
   if (!article) return <Navigate to="/education" replace />;

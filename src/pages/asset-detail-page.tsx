@@ -26,7 +26,7 @@ function AssetDetailPage() {
   const { has, toggle } = useWatchlist();
 
   useEffect(() => {
-    if (asset) document.title = `${asset.symbol} — ${asset.name} — FXoptions`;
+    if (asset) document.title = `${asset.symbol} ${asset.name} FXoptions`;
   }, [asset]);
 
   if (!asset) return <Navigate to="/markets" replace />;
@@ -149,7 +149,7 @@ function AssetDetailPage() {
               <CardTitle>Market Statistics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <StatRow label="Market Cap" value={asset.marketCap > 0 ? formatCurrency(asset.marketCap, { compact: true }) : "—"} />
+              <StatRow label="Market Cap" value={asset.marketCap > 0 ? formatCurrency(asset.marketCap, { compact: true }) : "N/A"} />
               <StatRow label="24H Volume" value={formatNumber(asset.volume24h, { compact: true })} />
               <StatRow label="90D High" value={formatCurrency(high90d)} />
               <StatRow label="90D Low" value={formatCurrency(low90d)} />
@@ -160,7 +160,7 @@ function AssetDetailPage() {
           <Alert variant="warning">
             <AlertTitle>Risk Information</AlertTitle>
             <AlertDescription>
-              This asset is classified as <strong className="text-foreground">{asset.riskLevel}</strong> risk. Real-time
+              This asset is classified as <strong className="text-foreground">{asset.riskLevel}</strong> risk. Real time
               market execution is active. Always ensure your position sizing aligns with your investment strategy.
             </AlertDescription>
           </Alert>
@@ -184,7 +184,7 @@ function AssetDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Trade {asset.symbol}</DialogTitle>
-            <DialogDescription>Execute real-time order for your live trading portfolio.</DialogDescription>
+            <DialogDescription>Execute real time order for your live trading portfolio.</DialogDescription>
           </DialogHeader>
           <PaperOrderForm defaultSymbol={asset.symbol} onSuccess={() => setTradeOpen(false)} />
         </DialogContent>

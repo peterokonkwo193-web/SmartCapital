@@ -522,7 +522,7 @@ export function useAdminData() {
                 await supabase.from("activities").insert({
                   user_id: userId,
                   type: "account",
-                  message: `Deposit of $${Number(request.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} approved — funds credited to your account.`,
+                  message: `Deposit of $${Number(request.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} approved. Funds credited to your account.`,
                 });
               } catch {
                 // Ignore activity RLS issue
