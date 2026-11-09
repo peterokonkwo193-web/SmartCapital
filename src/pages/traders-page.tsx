@@ -21,7 +21,7 @@ function TradersPage() {
   const [following, setFollowing] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    document.title = "Trader Strategies — SmartCapital";
+    document.title = "Trader Strategies — FXoptions";
   }, []);
 
   function toggleFollow(trader: Trader) {

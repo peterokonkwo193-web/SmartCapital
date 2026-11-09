@@ -39,8 +39,10 @@ export function LanguageSelector({
     const handleLangChange = () => {
       setCurrentLang(getCurrentLanguage());
     };
+    window.addEventListener("fxoptions_language_changed", handleLangChange);
     window.addEventListener("marketcapital_language_changed", handleLangChange);
     return () => {
+      window.removeEventListener("fxoptions_language_changed", handleLangChange);
       window.removeEventListener("marketcapital_language_changed", handleLangChange);
     };
   }, []);

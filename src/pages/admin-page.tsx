@@ -90,7 +90,7 @@ function AdminPage({ initialTab = "users" }: AdminPageProps) {
   }, [initialTab]);
 
   useEffect(() => {
-    document.title = "Admin — SmartCapital Enterprise";
+    document.title = "Admin — FXoptions Enterprise";
   }, []);
 
   const stats = useMemo(() => {

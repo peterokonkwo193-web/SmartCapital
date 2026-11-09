@@ -21,7 +21,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   { code: "ar", name: "Arabic", nativeName: "العربية", flag: "🇸🇦", popular: true },
   { code: "ru", name: "Russian", nativeName: "Русский", flag: "🇷🇺", popular: true },
 
-  // European & Global
+  // European, Asian & Global Languages
   { code: "tr", name: "Turkish", nativeName: "Türkçe", flag: "🇹🇷" },
   { code: "nl", name: "Dutch", nativeName: "Nederlands", flag: "🇳🇱" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "🇮🇳" },
@@ -40,17 +40,23 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   { code: "fi", name: "Finnish", nativeName: "Suomi", flag: "🇫🇮" },
   { code: "no", name: "Norwegian", nativeName: "Norsk", flag: "🇳🇴" },
   { code: "ms", name: "Malay", nativeName: "Bahasa Melayu", flag: "🇲🇾" },
+  { code: "tl", name: "Filipino (Tagalog)", nativeName: "Tagalog", flag: "🇵🇭" },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা", flag: "🇧🇩" },
+  { code: "fa", name: "Persian (Farsi)", nativeName: "فارسی", flag: "🇮🇷" },
+  { code: "ur", name: "Urdu", nativeName: "اردو", flag: "🇵🇰" },
+  { code: "sw", name: "Swahili", nativeName: "Kiswahili", flag: "🇰🇪" },
 ];
 
-const STORAGE_KEY = "marketcapital_language";
+const STORAGE_KEY = "fxoptions_language";
+const LEGACY_STORAGE_KEY = "marketcapital_language";
 
 export function getCurrentLanguageCode(): string {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (saved) return saved;
 
     // Check cookie
-    const match = document.cookie.match(/googtrans=\/en\/([a-zA-Z-]+)/);
+    const match = document.cookie.match(/googtrans=\/(?:en|auto)\/([a-zA-Z-]+)/);
     if (match && match[1]) {
       return match[1];
     }
@@ -68,53 +74,59 @@ export function getCurrentLanguage(): Language {
   return found || SUPPORTED_LANGUAGES[0];
 }
 
+/**
+ * Trigger the Google Translate select dropdown directly in the DOM
+ */
+function triggerTranslateCombo(langCode: string): boolean {
+  const combo = document.querySelector<HTMLSelectElement>("select.goog-te-combo");
+  if (combo) {
+    combo.value = langCode === "en" ? "" : langCode;
+    combo.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Apply the requested language across cookies, storage, Google Translate, and reload
+ */
 export function setLanguage(langCode: string): void {
+  // 1. Store preference
   try {
     localStorage.setItem(STORAGE_KEY, langCode);
+    localStorage.setItem(LEGACY_STORAGE_KEY, langCode);
   } catch {
     // Ignore storage errors
   }
 
-  const hostname = window.location.hostname;
-
+  // 2. Set Google Translate cookies
+  const host = window.location.hostname;
   if (langCode === "en") {
-    // Reset to default English
     document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname};`;
-    if (hostname.includes(".")) {
-      const parts = hostname.split(".");
-      if (parts.length > 2) {
-        const rootDomain = parts.slice(-2).join(".");
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${rootDomain};`;
-      }
-    }
+    document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${host};`;
   } else {
-    // Set cookie for Google Translate
-    const cookieVal = `/en/${langCode}`;
-    document.cookie = `googtrans=${cookieVal}; path=/;`;
-    document.cookie = `googtrans=${cookieVal}; path=/; domain=${hostname};`;
-    if (hostname.includes(".")) {
-      const parts = hostname.split(".");
-      if (parts.length > 2) {
-        const rootDomain = parts.slice(-2).join(".");
-        document.cookie = `googtrans=${cookieVal}; path=/; domain=.${rootDomain};`;
-      }
-    }
+    // Set both /en/target and /auto/target
+    const pathCookie = `googtrans=/en/${langCode}; path=/;`;
+    const pathAutoCookie = `googtrans=/auto/${langCode}; path=/;`;
+    document.cookie = pathCookie;
+    document.cookie = pathAutoCookie;
+    document.cookie = `googtrans=/en/${langCode}; path=/; domain=${host};`;
+    document.cookie = `googtrans=/auto/${langCode}; path=/; domain=${host};`;
   }
 
-  // Trigger Google Translate dropdown if loaded
-  const combo = document.querySelector<HTMLSelectElement>(".goog-te-combo");
-  if (combo) {
-    combo.value = langCode;
-    combo.dispatchEvent(new Event("change"));
-  }
-
-  // Dispatch custom event for React components
+  // 3. Dispatch custom event for UI updates
+  window.dispatchEvent(
+    new CustomEvent("fxoptions_language_changed", { detail: langCode })
+  );
   window.dispatchEvent(
     new CustomEvent("marketcapital_language_changed", { detail: langCode })
   );
 
-  // Reload page to ensure clean re-translation of dynamic React state
-  window.location.reload();
-}
+  // 4. Trigger Google Translate dropdown
+  triggerTranslateCombo(langCode);
 
+  // 5. Clean reload with tiny timeout to let Google Translate register change & re-render page
+  setTimeout(() => {
+    window.location.reload();
+  }, 250);
+}

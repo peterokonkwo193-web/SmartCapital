@@ -22,7 +22,7 @@ import type { SupportTicket, SupportTicketReply } from "@/types";
 import { Send } from "lucide-react";
 
 const FAQ = [
-  { question: "Is this a real trading platform?", answer: "Yes. SmartCapital is a live trading platform where you can buy and sell real financial assets. All orders are executed against real market prices." },
+  { question: "Is this a real trading platform?", answer: "Yes. FXoptions is a live trading platform where you can buy and sell real financial assets. All orders are executed against real market prices." },
   { question: "Where does market data come from?", answer: "Prices are streamed in real time from Binance WebSocket (crypto) and live market data feeds. All quotes reflect actual current market conditions." },
   { question: "How do I fund my account?", answer: "Go to the Deposits page, choose your preferred payment method (bank transfer, card, or crypto), and submit a deposit request. Our team will confirm it promptly." },
   { question: "Can I lose money trading?", answer: "Yes. Trading real assets involves financial risk. You may lose some or all of the funds you deposit. Only invest what you can afford to lose." },
@@ -38,7 +38,7 @@ function SupportPage() {
   const { tickets, repliesByTicket, loading, replyToTicket } = useSupportTickets();
 
   useEffect(() => {
-    document.title = "Customer Service — SmartCapital";
+    document.title = "Customer Service — FXoptions";
   }, []);
 
   const filteredFaq = useMemo(() => {
@@ -101,7 +101,7 @@ function SupportPage() {
               </Dialog>
               <div className="flex items-center gap-2.5 rounded-md border border-border px-3.5 py-3 text-sm text-muted-foreground">
                 <Mail className="size-4 shrink-0" />
-                support@smartcapital.app
+                support@fxoptions.app
               </div>
             </CardContent>
           </Card>

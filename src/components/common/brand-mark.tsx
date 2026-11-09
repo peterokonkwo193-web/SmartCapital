@@ -4,9 +4,15 @@ function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" fill="none" className={cn("size-8", className)} aria-hidden>
       <rect width="32" height="32" rx="8" className="fill-primary" />
+      {/* Stylized 'F' in Accent Gold */}
       <path
-        d="M10 20.5c0 2.2 2.1 3.5 5 3.5 3.4 0 5.6-1.6 5.6-4.1 0-2.1-1.4-3.2-4.3-3.9l-1.8-.4c-1.3-.3-1.9-.7-1.9-1.5 0-1 1-1.6 2.5-1.6 1.6 0 2.7.7 2.9 1.9h2.7c-.2-2.5-2.2-4-5.5-4-3.1 0-5.3 1.6-5.3 4 0 2 1.3 3.1 4.1 3.8l1.8.4c1.5.4 2.1.8 2.1 1.6 0 1-1.1 1.7-2.7 1.7-1.8 0-3-.7-3.2-2h-2.8Z"
+        d="M7.5 8.5h8.5v2.4h-5.8v3.4h4.8v2.3h-4.8V23.5H7.5V8.5Z"
         className="fill-accent"
+      />
+      {/* Stylized 'X' in Clean Contrast */}
+      <path
+        d="M16.5 12h2.8l2.2 3.8 2.2-3.8h2.8l-3.6 5.7 3.8 5.8h-2.9l-2.3-3.8-2.3 3.8h-2.9l3.7-5.8-3.6-5.7Z"
+        className="fill-primary-foreground"
       />
     </svg>
   );
@@ -17,7 +23,7 @@ function BrandLockup({ className, iconClassName }: { className?: string; iconCla
     <div className={cn("flex items-center gap-2.5", className)}>
       <BrandMark className={iconClassName} />
       <span className="font-sans text-[17px] font-bold tracking-tight text-foreground">
-        Smart<span className="text-primary">Capital</span>
+        FX<span className="text-primary font-extrabold">options</span>
       </span>
     </div>
   );

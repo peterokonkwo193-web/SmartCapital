@@ -11,7 +11,7 @@ export const TESTIMONIALS: Testimonial[] = [
     country: "Nigeria",
     initials: "AC",
     quote:
-      "SmartCapital gave me the institutional-grade execution and live market tools I needed to trade global equities with total confidence.",
+      "FXoptions gave me the institutional-grade execution and live market tools I needed to trade global equities with total confidence.",
   },
   {
     name: "Liam O'Sullivan",
@@ -32,7 +32,7 @@ export const TESTIMONIALS: Testimonial[] = [
     country: "Singapore",
     initials: "WZ",
     quote:
-      "Clean interface, real-time market execution, and powerful account management. SmartCapital delivers everything I expect from a premier trading platform.",
+      "Clean interface, real-time market execution, and powerful account management. FXoptions delivers everything I expect from a premier trading platform.",
   },
   {
     name: "Priya Nair",
@@ -46,6 +46,6 @@ export const TESTIMONIALS: Testimonial[] = [
     country: "Sweden",
     initials: "JB",
     quote:
-      "Fast deposits, instantaneous order fills, and a beautifully structured dashboard. SmartCapital is the best platform I've traded on.",
+      "Fast deposits, instantaneous order fills, and a beautifully structured dashboard. FXoptions is the best platform I've traded on.",
   },
 ];

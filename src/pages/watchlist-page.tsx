@@ -26,7 +26,7 @@ function WatchlistPage() {
   const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
-    document.title = "Watchlist — SmartCapital";
+    document.title = "Watchlist — FXoptions";
   }, []);
 
   const watchlistSymbols = useMemo(() => new Set(items.map((i) => i.symbol)), [items]);

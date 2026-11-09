@@ -26,7 +26,7 @@ function AssetDetailPage() {
   const { has, toggle } = useWatchlist();
 
   useEffect(() => {
-    if (asset) document.title = `${asset.symbol} — ${asset.name} — SmartCapital`;
+    if (asset) document.title = `${asset.symbol} — ${asset.name} — FXoptions`;
   }, [asset]);
 
   if (!asset) return <Navigate to="/markets" replace />;

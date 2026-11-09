@@ -31,7 +31,7 @@ function PaperTradingPage() {
   const [closingSymbol, setClosingSymbol] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = "Live Trading — SmartCapital";
+    document.title = "Live Trading — FXoptions";
   }, []);
 
   const liveAssetMap = useMemo(() => {

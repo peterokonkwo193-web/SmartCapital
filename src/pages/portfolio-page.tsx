@@ -19,7 +19,7 @@ function PortfolioPage() {
   const { orders, balance } = usePaperTrading();
 
   useEffect(() => {
-    document.title = "Portfolio — SmartCapital";
+    document.title = "Portfolio — FXoptions";
   }, []);
 
   const summary = useMemo(() => {

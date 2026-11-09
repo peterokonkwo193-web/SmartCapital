@@ -7,15 +7,15 @@
     <meta name="theme-color" content="#0B0F0E" />
     <meta
       name="description"
-      content="SmartCapital — premier live trading platform and market intelligence terminal. Execute real-time trades, manage your portfolio, and grow your wealth."
+      content="FXoptions — premier live trading platform and market intelligence terminal. Execute real-time trades, manage your portfolio, and grow your wealth."
     />
-    <meta property="og:title" content="SmartCapital — Live Trading & Market Intelligence" />
+    <meta property="og:title" content="FXoptions — Live Trading & Market Intelligence" />
     <meta
       property="og:description"
       content="Institutional-grade live trading platform and wealth management terminal with real-time market execution."
     />
     <meta property="og:type" content="website" />
-    <title>SmartCapital — Live Trading & Wealth Management</title>
+    <title>FXoptions — Live Trading & Wealth Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -24,25 +24,39 @@
     />
   </head>
   <body>
-    <div id="google_translate_element" style="display: none; position: absolute; top: -9999px; left: -9999px;"></div>
+    <!-- Hidden Google Translate Element -->
+    <div id="google_translate_element"></div>
     <script type="text/javascript">
+      // Pre-apply saved language from localStorage before translate element initializes
+      (function() {
+        try {
+          var saved = localStorage.getItem("fxoptions_language") || localStorage.getItem("marketcapital_language");
+          if (saved && saved !== "en") {
+            document.cookie = "googtrans=/en/" + saved + "; path=/;";
+            document.cookie = "googtrans=/auto/" + saved + "; path=/;";
+          }
+        } catch(e) {}
+      })();
+
       window.googleTranslateElementInit = function () {
         if (window.google && window.google.translate) {
-          new window.google.translate.TranslateElement(
-            {
-              pageLanguage: 'en',
-              autoDisplay: false
-            },
-            'google_translate_element'
-          );
+          try {
+            new window.google.translate.TranslateElement(
+              {
+                pageLanguage: 'en',
+                autoDisplay: false
+              },
+              'google_translate_element'
+            );
+          } catch(e) {
+            console.error("Translate init error:", e);
+          }
         }
       };
     </script>
     <script
       type="text/javascript"
-      src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
-      async
-      defer
+      src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
     ></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

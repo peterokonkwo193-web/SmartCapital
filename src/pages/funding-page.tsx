@@ -79,7 +79,7 @@ export default function FundingPage() {
   const { transactions, loading: historyLoading } = useFundingHistory();
 
   useEffect(() => {
-    document.title = "Transactions & Funding — SmartCapital";
+    document.title = "Transactions & Funding — FXoptions";
   }, []);
 
   const handleTabChange = (val: string) => {
@@ -480,10 +480,10 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
               <Banknote className="size-4 text-primary" /> Institutional Bank Wire Details
             </div>
             <div className="space-y-1 text-muted-foreground">
-              <div><span className="font-medium text-foreground">Bank Name:</span> SmartCapital Global Trust</div>
-              <div><span className="font-medium text-foreground">Account Name:</span> Market Capital Client Escrow</div>
+              <div><span className="font-medium text-foreground">Bank Name:</span> FXoptions Global Trust</div>
+              <div><span className="font-medium text-foreground">Account Name:</span> FXoptions Client Escrow</div>
               <div><span className="font-medium text-foreground">Account / IBAN:</span> US89 3100 0214 5590 1204 88</div>
-              <div><span className="font-medium text-foreground">SWIFT / BIC:</span> SCAPUS33XXX</div>
+              <div><span className="font-medium text-foreground">SWIFT / BIC:</span> FXOPUS33XXX</div>
             </div>
           </div>
         )}

@@ -237,11 +237,22 @@ body {
   box-shadow: none !important;
 }
 
+/* Hide Google widget container safely without preventing JS initialization */
 #google_translate_element {
-  display: none !important;
+  position: fixed !important;
+  bottom: -9999px !important;
+  right: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0.01 !important;
+  pointer-events: none !important;
+  z-index: -9999 !important;
 }
 
-body > .skiptranslate {
+/* Hide Google Translate top banner iframe if present */
+iframe.skiptranslate {
   display: none !important;
+  visibility: hidden !important;
 }
 

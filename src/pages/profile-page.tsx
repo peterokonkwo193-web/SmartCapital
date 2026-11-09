@@ -30,7 +30,7 @@ function ProfilePage() {
   const initialTab = params.get("tab") ?? "profile";
 
   useEffect(() => {
-    document.title = "Profile — SmartCapital";
+    document.title = "Profile — FXoptions";
   }, []);
 
   return (
@@ -384,7 +384,7 @@ function AppearanceTab() {
         <CardTitle className="flex items-center gap-2">
           <Palette className="size-4" /> Appearance
         </CardTitle>
-        <CardDescription>Choose how SmartCapital looks on this device.</CardDescription>
+        <CardDescription>Choose how FXoptions looks on this device.</CardDescription>
       </CardHeader>
       <CardContent>
         <ThemeToggle />
