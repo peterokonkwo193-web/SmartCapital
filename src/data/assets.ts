@@ -26,14 +26,14 @@ const SEEDS: AssetSeed[] = [
   { symbol: "PG", name: "Procter & Gamble Co.", category: "stocks", basePrice: 168, volatility: 0.01, sector: "Consumer Staples", riskLevel: "Low", description: "Consumer packaged-goods company producing household, personal care, and hygiene brands." },
 
   // Crypto
-  { symbol: "BTC", name: "Bitcoin", category: "crypto", basePrice: 64200, volatility: 0.035, riskLevel: "Very High", description: "The first and largest cryptocurrency by market capitalization, operating on a decentralized proof-of-work network." },
-  { symbol: "ETH", name: "Ethereum", category: "crypto", basePrice: 3180, volatility: 0.04, riskLevel: "Very High", description: "A programmable blockchain network supporting smart contracts and decentralized applications." },
-  { symbol: "SOL", name: "Solana", category: "crypto", basePrice: 142, volatility: 0.055, riskLevel: "Very High", description: "A high-throughput blockchain platform designed for decentralized apps and marketplaces." },
-  { symbol: "BNB", name: "BNB", category: "crypto", basePrice: 578, volatility: 0.04, riskLevel: "Very High", description: "Native token of the BNB Chain ecosystem, used for transaction fees and platform utility." },
-  { symbol: "XRP", name: "XRP", category: "crypto", basePrice: 0.58, volatility: 0.05, riskLevel: "Very High", description: "Digital asset used on a payment network designed for fast cross-border settlement." },
-  { symbol: "ADA", name: "Cardano", category: "crypto", basePrice: 0.44, volatility: 0.048, riskLevel: "Very High", description: "A proof-of-stake blockchain platform focused on peer-reviewed protocol development." },
-  { symbol: "DOGE", name: "Dogecoin", category: "crypto", basePrice: 0.14, volatility: 0.065, riskLevel: "Very High", description: "A peer-to-peer digital currency that originated as an internet meme and is used for tipping and payments." },
-  { symbol: "AVAX", name: "Avalanche", category: "crypto", basePrice: 27, volatility: 0.058, riskLevel: "Very High", description: "A layer-1 blockchain platform supporting custom, interoperable subnetworks." },
+  { symbol: "BTC", name: "Bitcoin", category: "crypto", basePrice: 74142.88, volatility: 0.025, riskLevel: "Very High", description: "The first and largest cryptocurrency by market capitalization, operating on a decentralized proof of work network." },
+  { symbol: "ETH", name: "Ethereum", category: "crypto", basePrice: 2117.0, volatility: 0.03, riskLevel: "Very High", description: "A programmable blockchain network supporting smart contracts and decentralized applications." },
+  { symbol: "SOL", name: "Solana", category: "crypto", basePrice: 86.0, volatility: 0.04, riskLevel: "Very High", description: "A high-throughput blockchain platform designed for decentralized apps and marketplaces." },
+  { symbol: "BNB", name: "BNB", category: "crypto", basePrice: 689.5, volatility: 0.025, riskLevel: "Very High", description: "Native token of the BNB Chain ecosystem, used for transaction fees and platform utility." },
+  { symbol: "XRP", name: "XRP", category: "crypto", basePrice: 1.09, volatility: 0.045, riskLevel: "Very High", description: "Digital asset used on a payment network designed for fast cross-border settlement." },
+  { symbol: "ADA", name: "Cardano", category: "crypto", basePrice: 0.18, volatility: 0.04, riskLevel: "Very High", description: "A proof of stake blockchain platform focused on peer-reviewed protocol development." },
+  { symbol: "DOGE", name: "Dogecoin", category: "crypto", basePrice: 0.069, volatility: 0.05, riskLevel: "Very High", description: "A peer to peer digital currency that originated as an internet meme and is used for tipping and payments." },
+  { symbol: "AVAX", name: "Avalanche", category: "crypto", basePrice: 8.31, volatility: 0.045, riskLevel: "Very High", description: "A layer-1 blockchain platform supporting custom, interoperable subnetworks." },
 
   // ETFs
   { symbol: "SPY", name: "SPDR S&P 500 ETF", category: "etfs", basePrice: 561, volatility: 0.012, riskLevel: "Moderate", description: "Tracks the S&P 500 Index, offering diversified exposure to large-cap U.S. equities." },

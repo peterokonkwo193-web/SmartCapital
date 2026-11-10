@@ -213,7 +213,7 @@ export function CustomerServiceWidget() {
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
                     <Sparkles className="size-4" />
-                    <span>Welcome to FXoptions Service Desk</span>
+                    <span>Welcome to <span className="notranslate" translate="no">FXoptions</span> Service Desk</span>
                   </div>
                   <p className="text-muted-foreground text-xs leading-relaxed">
                     Our dedicated client team is available 24/7. Select a common inquiry below or send us a direct message.
@@ -380,7 +380,7 @@ export function CustomerServiceWidget() {
                 </Button>
               </div>
               <p className="mt-1.5 text-[10px] text-muted-foreground text-center">
-                Press Enter to send · Monitored 24/7 by FXoptions agents
+                Press Enter to send · Monitored 24/7 by <span className="notranslate" translate="no">FXoptions</span> agents
               </p>
             </div>
           )}

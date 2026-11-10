@@ -20,10 +20,10 @@ function BrandMark({ className }: { className?: string }) {
 
 function BrandLockup({ className, iconClassName }: { className?: string; iconClassName?: string }) {
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
+    <div className={cn("flex items-center gap-2.5 notranslate", className)} translate="no">
       <BrandMark className={iconClassName} />
-      <span className="font-sans text-[17px] font-bold tracking-tight text-foreground" translate="no">
-        FX<span className="text-primary font-extrabold">options</span>
+      <span className="font-sans text-[17px] font-bold tracking-tight text-foreground notranslate" translate="no">
+        FX<span className="text-primary font-extrabold notranslate" translate="no">options</span>
       </span>
     </div>
   );

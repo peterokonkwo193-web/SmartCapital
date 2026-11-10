@@ -90,7 +90,7 @@ function BrandPanel() {
           Trade markets. Grow your wealth.
         </h1>
         <p className="text-[15px] leading-relaxed text-sidebar-muted">
-          FXoptions gives you institutional grade live market data and real order execution so you can
+          <span className="notranslate" translate="no">FXoptions</span> gives you institutional grade live market data and real order execution so you can
           trade real assets with confidence.
         </p>
 
@@ -101,7 +101,7 @@ function BrandPanel() {
         </ul>
       </div>
 
-      <p className="relative text-xs text-sidebar-muted">© {new Date().getFullYear()} FXoptions. Professional live trading platform.</p>
+      <p className="relative text-xs text-sidebar-muted">© {new Date().getFullYear()} <span className="notranslate" translate="no">FXoptions</span>. Professional live trading platform.</p>
     </div>
   );
 }
@@ -302,7 +302,7 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
     <div className="space-y-6">
       <div className="space-y-1.5">
         <h2 className="text-xl font-semibold tracking-tight">Create your account</h2>
-        <p className="text-sm text-muted-foreground">Join FXoptions and start trading live markets today.</p>
+        <p className="text-sm text-muted-foreground">Join <span className="notranslate" translate="no">FXoptions</span> and start trading live markets today.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">

@@ -111,32 +111,34 @@ class LiveMarketService {
 
   public start(): void {
     if (typeof window === "undefined") return;
-    // Seed crypto quotes with real prices from CoinGecko before WS starts
-    fetchCoinGeckoPrices().then((geckoMap) => {
-      if (Object.keys(geckoMap).length > 0) {
-        for (const [sym, { price, change24h }] of Object.entries(geckoMap)) {
-          const existing = this.currentQuotes.get(sym);
-          if (existing) {
-            const updated: LiveQuoteUpdate = {
-              ...existing,
-              price,
-              changePercent24h: change24h,
-              timestamp: Date.now(),
-              direction: "flat",
-            };
-            this.currentQuotes.set(sym, updated);
-            this.notifyQuote(updated);
+
+    // Immediately connect live Binance WebSocket stream and TradFi ticks
+    this.connectBinanceWs();
+    this.startMicroTicksForTradFi();
+
+    // In parallel background, query CoinGecko for instant 24h market baseline
+    fetchCoinGeckoPrices()
+      .then((geckoMap) => {
+        if (Object.keys(geckoMap).length > 0) {
+          for (const [sym, { price, change24h }] of Object.entries(geckoMap)) {
+            const existing = this.currentQuotes.get(sym);
+            if (existing) {
+              const updated: LiveQuoteUpdate = {
+                ...existing,
+                price,
+                changePercent24h: change24h,
+                timestamp: Date.now(),
+                direction: "flat",
+              };
+              this.currentQuotes.set(sym, updated);
+              this.notifyQuote(updated);
+            }
           }
         }
-      }
-      // Connect live stream after seeding
-      this.connectBinanceWs();
-      this.startMicroTicksForTradFi();
-    }).catch(() => {
-      // Fallback: connect directly even if CoinGecko fails
-      this.connectBinanceWs();
-      this.startMicroTicksForTradFi();
-    });
+      })
+      .catch(() => {
+        // Silently continue with Binance WS
+      });
   }
 
   public stop(): void {
