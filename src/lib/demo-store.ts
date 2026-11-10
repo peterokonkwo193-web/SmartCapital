@@ -75,6 +75,16 @@ function getUserData(userId: string): DemoUserData | null {
   return data;
 }
 
+export function ensureUserData(userId: string, email?: string, name?: string): DemoUserData {
+  let data = getUserData(userId);
+  if (!data) {
+    const userEmail = email || `${userId}@client.fxoptions.app`;
+    const fullName = name || "Client User";
+    data = seedUserData(userId, fullName, "", userEmail, "", "");
+  }
+  return data;
+}
+
 function saveUserData(userId: string, data: DemoUserData): void {
   writeJSON(key(`user:${userId}`), data);
 }
@@ -309,15 +319,14 @@ export function createSupportTicket(
   userId: string,
   ticket: Omit<SupportTicket, "id" | "status" | "createdAt">,
 ): SupportTicket {
-  const data = getUserData(userId);
-  if (!data) throw new Error("User not found.");
+  const data = ensureUserData(userId);
   const newTicket: SupportTicket = {
     ...ticket,
     id: crypto.randomUUID(),
     status: "open",
     createdAt: new Date().toISOString(),
   };
-  data.supportTickets = [newTicket, ...data.supportTickets];
+  data.supportTickets = [newTicket, ...(data.supportTickets ?? [])];
   saveUserData(userId, data);
   logActivity(userId, "support", `Opened support ticket: ${ticket.subject}`);
   return newTicket;
@@ -336,8 +345,7 @@ export function addTicketReply(
   authorName: string,
   authorIsAdmin = true,
 ): SupportTicketReply {
-  const data = getUserData(userId);
-  if (!data) throw new Error("User not found.");
+  const data = ensureUserData(userId);
   if (!data.ticketReplies) data.ticketReplies = {};
 
   const reply: SupportTicketReply = {
@@ -368,8 +376,7 @@ export function createDepositRequest(
   proofImageUrl: string,
   note: string | undefined,
 ): DepositRequest {
-  const data = getUserData(userId);
-  if (!data) throw new Error("User not found.");
+  const data = ensureUserData(userId);
   if (!data.depositRequests) data.depositRequests = [];
 
   const request: DepositRequest = {
@@ -569,8 +576,7 @@ export function createWithdrawalRequest(
   destinationDetails: string,
   note?: string,
 ): WithdrawalRequest {
-  const data = getUserData(userId);
-  if (!data) throw new Error("User not found.");
+  const data = ensureUserData(userId);
 
   if (amount > data.practiceBalance) {
     throw new Error(`Insufficient funds. Your available balance is $${data.practiceBalance.toFixed(2)}.`);

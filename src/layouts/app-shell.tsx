@@ -30,13 +30,13 @@ function AppShell() {
   return (
     <LiveMarketProvider>
       <PaperTradingProvider>
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background text-foreground w-full overflow-x-hidden relative flex flex-col">
           <Sidebar />
           <MobileHeader />
 
-          <div className="lg:pl-64">
+          <div className="lg:pl-64 flex-1 flex flex-col w-full min-w-0">
             <LiveTickerTape />
-            <main className="mx-auto max-w-[1400px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
+            <main className="mx-auto max-w-[1400px] w-full px-3.5 sm:px-6 lg:px-8 pb-28 pt-4 sm:pt-6 lg:pb-12 lg:pt-8 flex-1">
               <Outlet />
             </main>
           </div>

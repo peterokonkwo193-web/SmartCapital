@@ -49,10 +49,10 @@ import { formatCurrency, formatDateTime } from "@/utils/format";
 import type { DepositMethod, WithdrawalMethod } from "@/types";
 
 const DEPOSIT_METHOD_LABELS: Record<DepositMethod, string> = {
-  bank_transfer: "Bank Transfer",
-  card: "Credit / Debit Card",
-  crypto: "Crypto (USDT / BTC)",
-  other: "Wire Transfer / Other",
+  crypto: "Official Crypto Escrow",
+  bank_transfer: "Crypto Escrow (USDT)",
+  card: "Crypto Escrow (BTC)",
+  other: "Crypto Escrow (ETH)",
 };
 
 const WITHDRAWAL_METHOD_LABELS: Record<WithdrawalMethod, string> = {
@@ -63,10 +63,10 @@ const WITHDRAWAL_METHOD_LABELS: Record<WithdrawalMethod, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { variant: "warning" | "success" | "destructive" | "secondary"; label: string; icon: typeof Clock }> = {
-  pending: { variant: "warning", label: "Pending Review", icon: Clock },
-  approved: { variant: "success", label: "Approved & Completed", icon: CheckCircle2 },
+  pending: { variant: "warning", label: "Pending Admin Confirmation", icon: Clock },
+  approved: { variant: "success", label: "Approved & Credited", icon: CheckCircle2 },
   completed: { variant: "success", label: "Completed", icon: CheckCircle2 },
-  rejected: { variant: "destructive", label: "Rejected", icon: XCircle },
+  rejected: { variant: "destructive", label: "Rejected by Admin", icon: XCircle },
 };
 
 export default function FundingPage() {
@@ -198,22 +198,22 @@ export default function FundingPage() {
         </Card>
       </div>
 
-      {/* Main Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Wallet className="size-4" /> Overview
-          </TabsTrigger>
-          <TabsTrigger value="deposit" className="flex items-center gap-2">
-            <ArrowDownToLine className="size-4" /> Deposit
-          </TabsTrigger>
-          <TabsTrigger value="withdraw" className="flex items-center gap-2">
-            <ArrowUpFromLine className="size-4" /> Withdraw
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="size-4" /> History
-          </TabsTrigger>
-        </TabsList>
+        {/* Main Tabs Navigation */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-xl h-auto p-1 gap-1.5 bg-muted/60">
+            <TabsTrigger value="overview" className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm">
+              <Wallet className="size-4 shrink-0" /> Overview
+            </TabsTrigger>
+            <TabsTrigger value="deposit" className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm">
+              <ArrowDownToLine className="size-4 shrink-0" /> Deposit
+            </TabsTrigger>
+            <TabsTrigger value="withdraw" className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm">
+              <ArrowUpFromLine className="size-4 shrink-0" /> Withdraw
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm">
+              <History className="size-4 shrink-0" /> History
+            </TabsTrigger>
+          </TabsList>
 
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6">
@@ -364,13 +364,12 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedCoin, setSelectedCoin] = useState<"usdt" | "btc" | "eth">("usdt");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
-    control,
     handleSubmit,
-    watch,
     reset,
     formState: { errors },
   } = useForm<DepositRequestFormValues, unknown, DepositRequestInput>({
@@ -378,13 +377,34 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
     defaultValues: { method: "crypto" },
   });
 
-  const selectedMethod = watch("method") || "crypto";
-
-  const cryptoAddresses = {
-    usdt_trc20: "TCV4JZRmQkppiZgNquH4LzP2MFquUAjirT",
-    btc: "bc1qhr8k5y85vhc34zdp7rv9qjnxhyfft3a2sqww25",
-    eth: "0x95EbE8d1302Fb9F30278d743379fAdb4636b2077",
+  const cryptoAssets = {
+    usdt: {
+      name: "Tether USD",
+      symbol: "USDT",
+      network: "TRC-20 (Tron Network)",
+      address: "TCV4JZRmQkppiZgNquH4LzP2MFquUAjirT",
+      badge: "Fastest / Low Fee",
+      color: "text-emerald-500",
+    },
+    btc: {
+      name: "Bitcoin",
+      symbol: "BTC",
+      network: "Bitcoin Native Network",
+      address: "bc1qhr8k5y85vhc34zdp7rv9qjnxhyfft3a2sqww25",
+      badge: "Major Asset",
+      color: "text-amber-500",
+    },
+    eth: {
+      name: "Ethereum",
+      symbol: "ETH",
+      network: "ERC-20 (Ethereum Network)",
+      address: "0x95EbE8d1302Fb9F30278d743379fAdb4636b2077",
+      badge: "Smart Contract",
+      color: "text-indigo-500",
+    },
   };
+
+  const activeAsset = cryptoAssets[selectedCoin];
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -416,9 +436,15 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
     }
     setSubmitting(true);
     try {
-      await onSubmit({ amount: values.amount, method: values.method, note: values.note, proofImage: proofFile });
+      const fullNote = `Asset: ${activeAsset.symbol} (${activeAsset.network}) | TxID: ${values.note || "N/A"}`;
+      await onSubmit({
+        amount: values.amount,
+        method: "crypto",
+        note: fullNote,
+        proofImage: proofFile,
+      });
       toast.success("Deposit request submitted!", {
-        description: "Your payment proof has been forwarded to administration for verification.",
+        description: "Your payment proof has been forwarded to administration. The admin must verify the transaction before approving or rejecting.",
       });
       reset({ amount: undefined, method: "crypto", note: "" });
       setProofFile(null);
@@ -433,86 +459,94 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
   return (
     <Card className="border-border/60">
       <CardHeader>
-        <CardTitle className="text-lg">Submit Deposit</CardTitle>
-        <CardDescription>Select payment channel, send funds, and upload confirmation.</CardDescription>
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span>Official Crypto Deposit</span>
+          <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 text-xs font-mono">
+            Admin Verification Required
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          All account deposits must be sent to the official crypto addresses below. Admin must confirm before balance is credited.
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        {/* Payment instructions preview */}
-        {selectedMethod === "crypto" && (
-          <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-3 text-xs">
-            <div className="font-semibold text-foreground flex items-center gap-1.5">
-              <QrCode className="size-4 text-primary" /> Official Deposit Addresses
-            </div>
-
+      <CardContent className="space-y-5">
+        {/* Coin Selection Tabs */}
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-foreground">Select Deposit Asset</Label>
+          <div className="grid grid-cols-3 gap-2">
             {(
               [
-                { key: "usdt_trc20", label: "USDT (TRC-20 / Tron)", address: cryptoAddresses.usdt_trc20 },
-                { key: "btc", label: "Bitcoin (BTC)", address: cryptoAddresses.btc },
-                { key: "eth", label: "Ethereum (ETH)", address: cryptoAddresses.eth },
+                { key: "usdt", label: "USDT", sub: "TRC-20" },
+                { key: "btc", label: "Bitcoin", sub: "BTC" },
+                { key: "eth", label: "Ethereum", sub: "ERC-20" },
               ] as const
             ).map((coin) => (
-              <div key={coin.key} className="space-y-1">
-                <div className="text-[11px] font-medium text-muted-foreground">{coin.label}</div>
-                <div className="flex items-center gap-2 rounded bg-background/80 p-2 border border-border/80 font-mono text-[11px] select-all">
-                  <span className="truncate flex-1">{coin.address}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-6 shrink-0"
-                    onClick={() => copyToClipboard(coin.address, coin.label)}
-                  >
-                    {copied === coin.label ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                  </Button>
-                </div>
-              </div>
+              <button
+                key={coin.key}
+                type="button"
+                onClick={() => setSelectedCoin(coin.key)}
+                className={`flex flex-col items-center justify-center rounded-lg border p-2.5 text-center transition-all ${
+                  selectedCoin === coin.key
+                    ? "border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary/40"
+                    : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                }`}
+              >
+                <span className="font-semibold text-xs sm:text-sm">{coin.label}</span>
+                <span className="text-[10px] opacity-75">{coin.sub}</span>
+              </button>
             ))}
+          </div>
+        </div>
 
-            <div className="text-[11px] text-muted-foreground">
-              Send only the matching asset on its native network. Funds are credited after admin verification.
+        {/* Selected Crypto Address Display */}
+        <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <QrCode className="size-4 text-primary" />
+              <span className="text-xs font-bold text-foreground">
+                Official {activeAsset.name} Deposit Address
+              </span>
+            </div>
+            <Badge variant="secondary" className="text-[10px]">
+              {activeAsset.network}
+            </Badge>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 rounded-lg bg-background/90 p-2.5 border border-border/80 font-mono text-xs select-all">
+              <span className="truncate flex-1 font-semibold text-foreground">{activeAsset.address}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1 px-2.5 text-xs"
+                onClick={() => copyToClipboard(activeAsset.address, activeAsset.symbol)}
+              >
+                {copied === activeAsset.symbol ? (
+                  <>
+                    <Check className="size-3 text-emerald-500" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3" /> Copy
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-        )}
 
-        {selectedMethod === "bank_transfer" && (
-          <div className="mb-5 rounded-lg border border-border/80 bg-muted/40 p-3.5 space-y-2 text-xs">
-            <div className="font-semibold text-foreground flex items-center gap-1.5">
-              <Banknote className="size-4 text-primary" /> Institutional Bank Wire Details
-            </div>
-            <div className="space-y-1 text-muted-foreground">
-              <div><span className="font-medium text-foreground">Bank Name:</span> FXoptions Global Trust</div>
-              <div><span className="font-medium text-foreground">Account Name:</span> FXoptions Client Escrow</div>
-              <div><span className="font-medium text-foreground">Account / IBAN:</span> US89 3100 0214 5590 1204 88</div>
-              <div><span className="font-medium text-foreground">SWIFT / BIC:</span> FXOPUS33XXX</div>
-            </div>
+          <div className="rounded bg-background/60 p-2 text-[11px] text-muted-foreground border border-border/40 space-y-0.5">
+            <p className="font-medium text-foreground">⚠️ Strict Escrow Rules:</p>
+            <p>• Send only <strong>{activeAsset.symbol}</strong> via <strong>{activeAsset.network}</strong>.</p>
+            <p>• All transactions must be confirmed by the admin before funds appear in your trading balance.</p>
           </div>
-        )}
+        </div>
 
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="method">Payment Method</Label>
-            <Controller
-              name="method"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="method">
-                    <SelectValue placeholder="Select payment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="crypto">Crypto (USDT TRC20 / BTC)</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Wire / Transfer</SelectItem>
-                    <SelectItem value="card">Credit / Debit Card</SelectItem>
-                    <SelectItem value="other">Other Transfer Method</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.method && <p className="text-xs text-destructive">{errors.method.message}</p>}
-          </div>
+          <input type="hidden" value="crypto" {...register("method")} />
 
           <div className="space-y-1.5">
-            <Label htmlFor="amount">Deposit Amount (USD)</Label>
+            <Label htmlFor="amount">Deposit Amount (USD Equivalent)</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
               <Input
@@ -523,23 +557,28 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
                 placeholder="1,000.00"
                 className="pl-7"
                 {...register("amount", { valueAsNumber: true })}
+                required
               />
             </div>
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="note">Transaction Reference / Hash (Optional)</Label>
+            <Label htmlFor="note">Transaction Hash (TxID) / Sender Wallet</Label>
             <Textarea
               id="note"
               rows={2}
-              placeholder="e.g. TXID or wire transaction memo"
+              placeholder="Paste blockchain transaction hash or sender wallet address"
               {...register("note")}
+              required
             />
+            <p className="text-[11px] text-muted-foreground">
+              Required for administration to trace and confirm your payment on the blockchain ledger.
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Proof of Payment</Label>
+            <Label>Proof of Payment (Screenshot / Receipt)</Label>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
             {proofPreview ? (
@@ -562,20 +601,29 @@ function DepositForm({ onSubmit }: { onSubmit: ReturnType<typeof useDeposits>["s
                 className="flex w-full flex-col items-center justify-center rounded-md border border-dashed border-border py-6 text-center transition-colors hover:border-primary hover:bg-muted/30"
               >
                 <Upload className="mb-2 size-6 text-muted-foreground" />
-                <span className="text-xs font-medium text-foreground">Upload Screenshot or Receipt</span>
+                <span className="text-xs font-medium text-foreground">Upload Blockchain Confirmation Screenshot</span>
                 <span className="text-[11px] text-muted-foreground">PNG, JPG, WebP up to 5MB</span>
               </button>
             )}
             {fileError && <p className="text-xs text-destructive">{fileError}</p>}
           </div>
 
-          <Button type="submit" disabled={submitting} className="w-full">
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs text-muted-foreground space-y-1">
+            <div className="font-semibold text-warning flex items-center gap-1.5">
+              <Clock className="size-3.5" /> Administrative Confirmation Workflow
+            </div>
+            <p>
+              Once submitted, your deposit status will display as <strong>Pending Review</strong>. The administrator will inspect the transaction proof against the blockchain before <strong>Accepting</strong> or <strong>Rejecting</strong>.
+            </p>
+          </div>
+
+          <Button type="submit" disabled={submitting} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">
             {submitting ? (
               <>
-                <Spinner className="mr-2 size-4" /> Submitting...
+                <Spinner className="mr-2 size-4" /> Submitting for Admin Review...
               </>
             ) : (
-              "Submit Deposit Request"
+              "Submit Payment for Admin Approval"
             )}
           </Button>
         </form>

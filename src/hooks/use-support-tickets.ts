@@ -6,6 +6,22 @@ import * as demoStore from "@/lib/demo-store";
 import { useAuth } from "@/hooks/use-auth";
 import type { SupportTicket, SupportTicketReply } from "@/types";
 
+const GUEST_ID_KEY = "fxoptions_guest_support_id";
+
+function getEffectiveUserId(signedInUserId?: string): string {
+  if (signedInUserId) return signedInUserId;
+  try {
+    let guestId = localStorage.getItem(GUEST_ID_KEY);
+    if (!guestId) {
+      guestId = "guest_" + crypto.randomUUID().slice(0, 8);
+      localStorage.setItem(GUEST_ID_KEY, guestId);
+    }
+    return guestId;
+  } catch {
+    return "guest_user";
+  }
+}
+
 export function useSupportTickets() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -14,65 +30,99 @@ export function useSupportTickets() {
   const seenReplyIds = useRef<Set<string> | null>(null);
 
   const load = useCallback(async () => {
-    if (!user) {
-      setTickets([]);
-      setRepliesByTicket({});
-      setLoading(false);
-      return;
-    }
-    if (isSupabaseConfigured && supabase) {
-      const [{ data }, { data: replyRows }] = await Promise.all([
-        supabase.from("support_tickets").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-        // RLS scopes this to the caller's own non-internal replies — no manual filtering needed.
-        supabase.from("support_ticket_replies").select("*, profiles(full_name, role)").order("created_at", { ascending: true }),
-      ]);
-      setTickets(
-        (data ?? []).map((row) => ({
-          id: row.id,
-          subject: row.subject,
-          message: row.message,
-          status: row.status,
-          category: row.category,
-          createdAt: row.created_at,
-        })),
-      );
-      const grouped: Record<string, SupportTicketReply[]> = {};
-      for (const row of replyRows ?? []) {
-        const reply: SupportTicketReply = {
-          id: row.id,
-          ticketId: row.ticket_id,
-          authorName: row.profiles?.full_name ?? "Support Team",
-          authorIsAdmin: row.profiles?.role === "admin",
-          message: row.message,
-          isInternal: row.is_internal,
-          createdAt: row.created_at,
-        };
-        (grouped[reply.ticketId] ??= []).push(reply);
-      }
-      setRepliesByTicket(grouped);
+    const effectiveUserId = getEffectiveUserId(user?.id);
+    let loadedTickets: SupportTicket[] = [];
+    const grouped: Record<string, SupportTicketReply[]> = {};
 
-      // Notify the user (toast, not on first load) when support replies.
-      const isFirstLoad = seenReplyIds.current === null;
-      if (seenReplyIds.current === null) seenReplyIds.current = new Set();
-      for (const replies of Object.values(grouped)) {
-        for (const reply of replies) {
-          if (!seenReplyIds.current.has(reply.id)) {
-            seenReplyIds.current.add(reply.id);
-            if (!isFirstLoad && reply.authorIsAdmin) {
-              toast.message(`New reply from ${reply.authorName}`, { description: reply.message });
+    // 1. Try Supabase first if available and authenticated
+    if (isSupabaseConfigured && supabase && user) {
+      try {
+        const { data: ticketRows, error: ticketErr } = await supabase
+          .from("support_tickets")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!ticketErr && ticketRows && ticketRows.length > 0) {
+          loadedTickets = ticketRows.map((row) => ({
+            id: row.id,
+            subject: row.subject,
+            message: row.message,
+            status: row.status,
+            category: row.category,
+            createdAt: row.created_at,
+          }));
+
+          // Fetch replies safely
+          try {
+            const { data: replyRows } = await supabase
+              .from("support_ticket_replies")
+              .select("*")
+              .order("created_at", { ascending: true });
+
+            if (replyRows) {
+              for (const row of replyRows) {
+                const isAdmin = row.author_id !== user.id;
+                const reply: SupportTicketReply = {
+                  id: row.id,
+                  ticketId: row.ticket_id,
+                  authorName: isAdmin ? "FXoptions Support Agent" : (user.fullName || "You"),
+                  authorIsAdmin: isAdmin,
+                  message: row.message,
+                  isInternal: Boolean(row.is_internal),
+                  createdAt: row.created_at,
+                };
+                (grouped[reply.ticketId] ??= []).push(reply);
+              }
             }
+          } catch {
+            // Non-fatal if reply query fails
+          }
+        }
+      } catch {
+        // Fall through to demoStore
+      }
+    }
+
+    // 2. Merge with local demoStore tickets
+    try {
+      const localTickets = demoStore.getSupportTickets(effectiveUserId);
+      for (const lt of localTickets) {
+        if (!loadedTickets.some((t) => t.id === lt.id)) {
+          loadedTickets.push(lt);
+        }
+        const localReplies = demoStore.getTicketReplies(effectiveUserId, lt.id).filter((r) => !r.isInternal);
+        if (localReplies.length > 0) {
+          const existingList = grouped[lt.id] ?? [];
+          for (const lr of localReplies) {
+            if (!existingList.some((r) => r.id === lr.id)) {
+              existingList.push(lr);
+            }
+          }
+          grouped[lt.id] = existingList;
+        }
+      }
+    } catch {
+      // Storage error ignored
+    }
+
+    setTickets(loadedTickets);
+    setRepliesByTicket(grouped);
+
+    // Notify user on new admin replies (except initial load)
+    const isFirstLoad = seenReplyIds.current === null;
+    if (seenReplyIds.current === null) seenReplyIds.current = new Set();
+    for (const replies of Object.values(grouped)) {
+      for (const reply of replies) {
+        if (!seenReplyIds.current.has(reply.id)) {
+          seenReplyIds.current.add(reply.id);
+          if (!isFirstLoad && reply.authorIsAdmin) {
+            toast.message(`New reply from ${reply.authorName}`, { description: reply.message });
           }
         }
       }
-    } else {
-      const userTickets = demoStore.getSupportTickets(user.id);
-      setTickets(userTickets);
-      const grouped: Record<string, SupportTicketReply[]> = {};
-      for (const ticket of userTickets) {
-        grouped[ticket.id] = demoStore.getTicketReplies(user.id, ticket.id).filter((r) => !r.isInternal);
-      }
-      setRepliesByTicket(grouped);
     }
+
     setLoading(false);
   }, [user]);
 
@@ -99,14 +149,36 @@ export function useSupportTickets() {
 
   const createTicket = useCallback(
     async (ticket: { subject: string; message: string; category: string }) => {
-      if (!user) throw new Error("You must be signed in to open a ticket.");
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from("support_tickets").insert({ user_id: user.id, ...ticket, status: "open" });
-        if (error) throw error;
-        await load();
-        return;
+      const effectiveUserId = getEffectiveUserId(user?.id);
+
+      if (isSupabaseConfigured && supabase && user) {
+        try {
+          await supabase
+            .from("support_tickets")
+            .insert({ user_id: user.id, ...ticket, status: "open" });
+        } catch {
+          // Fall through to local store
+        }
       }
-      demoStore.createSupportTicket(user.id, ticket);
+
+      // Always create in demoStore as persistent backup & instant UI update
+      const localTicket = demoStore.createSupportTicket(effectiveUserId, ticket);
+
+      // Automated acknowledgment from FXoptions customer service
+      setTimeout(() => {
+        try {
+          demoStore.addTicketReply(
+            effectiveUserId,
+            localTicket.id,
+            "Hello! Thank you for contacting FXoptions Customer Service. A dedicated agent has been assigned to your inquiry and will assist you shortly.",
+            false,
+            "FXoptions Support Desk",
+            true,
+          );
+          load();
+        } catch {}
+      }, 1200);
+
       await load();
     },
     [user, load],
@@ -114,24 +186,29 @@ export function useSupportTickets() {
 
   const replyToTicket = useCallback(
     async (ticketId: string, message: string) => {
-      if (!user) throw new Error("You must be signed in to reply.");
       const trimmed = message.trim();
       if (!trimmed) throw new Error("Message cannot be empty.");
+      const effectiveUserId = getEffectiveUserId(user?.id);
+      const authorName = user?.fullName || user?.email || "Client";
 
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase
-          .from("support_ticket_replies")
-          .insert({ ticket_id: ticketId, author_id: user.id, message: trimmed, is_internal: false });
-        if (error) throw error;
+      if (isSupabaseConfigured && supabase && user) {
+        try {
+          const { error } = await supabase
+            .from("support_ticket_replies")
+            .insert({ ticket_id: ticketId, author_id: user.id, message: trimmed, is_internal: false });
 
-        const ticket = tickets.find((t) => t.id === ticketId);
-        if (ticket && (ticket.status === "resolved" || ticket.status === "closed")) {
-          await supabase.from("support_tickets").update({ status: "open" }).eq("id", ticketId);
+          if (!error) {
+            const ticket = tickets.find((t) => t.id === ticketId);
+            if (ticket && (ticket.status === "resolved" || ticket.status === "closed")) {
+              await supabase.from("support_tickets").update({ status: "open" }).eq("id", ticketId);
+            }
+          }
+        } catch {
+          // Fall through to demoStore
         }
-        await load();
-        return;
       }
-      demoStore.addTicketReply(user.id, ticketId, trimmed, false, user.fullName || user.email, false);
+
+      demoStore.addTicketReply(effectiveUserId, ticketId, trimmed, false, authorName, false);
       await load();
     },
     [user, tickets, load],
