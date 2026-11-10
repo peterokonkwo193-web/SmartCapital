@@ -22,7 +22,7 @@ function BrandLockup({ className, iconClassName }: { className?: string; iconCla
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <BrandMark className={iconClassName} />
-      <span className="font-sans text-[17px] font-bold tracking-tight text-foreground">
+      <span className="font-sans text-[17px] font-bold tracking-tight text-foreground" translate="no">
         FX<span className="text-primary font-extrabold">options</span>
       </span>
     </div>

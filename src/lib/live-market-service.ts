@@ -36,6 +36,42 @@ const CRYPTO_BINANCE_PAIRS: Record<string, string> = {
   AVAX: "avaxusdt",
 };
 
+// CoinGecko coin IDs for seeding initial real prices (free public API, no key needed)
+const COINGECKO_IDS: Record<string, string> = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana",
+  BNB: "binancecoin",
+  XRP: "ripple",
+  ADA: "cardano",
+  DOGE: "dogecoin",
+  AVAX: "avalanche-2",
+};
+
+/**
+ * Fetch real current prices from CoinGecko public API (no API key required).
+ * Returns a map of symbol → { price, change24h } or empty map on failure.
+ */
+async function fetchCoinGeckoPrices(): Promise<Record<string, { price: number; change24h: number }>> {
+  try {
+    const ids = Object.values(COINGECKO_IDS).join(",");
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return {};
+    const data = await res.json() as Record<string, { usd: number; usd_24h_change: number }>;
+    const result: Record<string, { price: number; change24h: number }> = {};
+    for (const [sym, geckoId] of Object.entries(COINGECKO_IDS)) {
+      const row = data[geckoId];
+      if (row && typeof row.usd === "number") {
+        result[sym] = { price: row.usd, change24h: row.usd_24h_change ?? 0 };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 const BINANCE_TO_SYMBOL: Record<string, string> = Object.entries(CRYPTO_BINANCE_PAIRS).reduce(
   (acc, [sym, pair]) => ({ ...acc, [pair.toUpperCase()]: sym }),
   {}
@@ -75,8 +111,32 @@ class LiveMarketService {
 
   public start(): void {
     if (typeof window === "undefined") return;
-    this.connectBinanceWs();
-    this.startMicroTicksForTradFi();
+    // Seed crypto quotes with real prices from CoinGecko before WS starts
+    fetchCoinGeckoPrices().then((geckoMap) => {
+      if (Object.keys(geckoMap).length > 0) {
+        for (const [sym, { price, change24h }] of Object.entries(geckoMap)) {
+          const existing = this.currentQuotes.get(sym);
+          if (existing) {
+            const updated: LiveQuoteUpdate = {
+              ...existing,
+              price,
+              changePercent24h: change24h,
+              timestamp: Date.now(),
+              direction: "flat",
+            };
+            this.currentQuotes.set(sym, updated);
+            this.notifyQuote(updated);
+          }
+        }
+      }
+      // Connect live stream after seeding
+      this.connectBinanceWs();
+      this.startMicroTicksForTradFi();
+    }).catch(() => {
+      // Fallback: connect directly even if CoinGecko fails
+      this.connectBinanceWs();
+      this.startMicroTicksForTradFi();
+    });
   }
 
   public stop(): void {
